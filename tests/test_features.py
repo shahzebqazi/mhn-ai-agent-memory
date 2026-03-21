@@ -218,3 +218,97 @@ def test_diagnose_returns_actionable_info():
     assert isinstance(diag["steps"], int)
     assert isinstance(diag["converged"], bool)
     assert isinstance(diag["recommendation"], str)
+
+
+# ─── Match detection tests ───────────────────────────────────────────
+
+
+def test_has_match_returns_true_for_stored_fact():
+    """A query with keywords from a stored fact should be detected as a match."""
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+
+    mem.store("The Eiffel Tower is located in Paris France")
+    mem.store("Mount Fuji is the tallest mountain in Japan")
+    mem.store("The Amazon river flows through Brazil")
+    mem.store("The Great Barrier Reef is in Australia")
+    mem.store("The Sahara is the largest hot desert in the world")
+
+    assert mem.has_match("Eiffel Tower Paris France")
+    assert mem.has_match("Mount Fuji tallest Japan")
+    assert mem.has_match("Amazon river Brazil")
+
+
+def test_has_match_returns_false_for_unrelated_query():
+    """A query with no word overlap to any stored fact should be a non-match."""
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+
+    mem.store("Photosynthesis converts sunlight into chemical energy")
+    mem.store("Mitochondria produce adenosine triphosphate in cells")
+    mem.store("Ribosomes synthesize proteins from messenger RNA")
+    mem.store("Chloroplasts contain chlorophyll pigments")
+    mem.store("Lysosomes digest cellular waste materials")
+
+    assert not mem.has_match("basketball quarterback touchdown score")
+
+
+def test_query_or_none_returns_fact_when_matched():
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("Neptune is the eighth planet from the Sun")
+    mem.store("Saturn has prominent ring system")
+
+    result = mem.query_or_none("Neptune eighth planet Sun")
+    assert result is not None
+    assert "neptune" in result.lower()
+
+
+def test_query_or_none_returns_none_when_unmatched():
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("Photosynthesis converts sunlight into chemical energy")
+    mem.store("Mitochondria produce adenosine triphosphate in cells")
+    mem.store("Ribosomes synthesize proteins from messenger RNA")
+    mem.store("Chloroplasts contain chlorophyll pigments")
+    mem.store("Lysosomes digest cellular waste materials")
+
+    result = mem.query_or_none("quarterback touchdown interception fumble")
+    assert result is None
+
+
+def test_match_quality_returns_all_signals():
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("Hydrogen is the lightest chemical element")
+    mem.store("Helium is used in balloons and airships")
+
+    mq = mem.match_quality("Hydrogen lightest element")
+    assert "gap" in mq
+    assert "energy" in mq
+    assert "sentinel_weight" in mq
+    assert "top_confidence" in mq
+    assert "is_match" in mq
+    assert isinstance(mq["is_match"], bool)
+
+
+def test_sentinel_excluded_from_results():
+    """The sentinel pattern must never appear in retrieve() results."""
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("Test fact one")
+    mem.store("Test fact two")
+
+    results = mem.retrieve("Test fact", top_k=10)
+    for fact, _ in results:
+        assert fact != "", "Sentinel (empty string) should not appear in results"
+
+
+def test_num_facts_excludes_sentinel():
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    assert mem.num_facts == 0
+    mem.store("First fact")
+    assert mem.num_facts == 1
+    mem.store("Second fact")
+    assert mem.num_facts == 2

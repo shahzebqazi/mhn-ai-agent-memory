@@ -6,7 +6,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-27%20passing-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-34%20passing-brightgreen.svg)](#development)
 [![arXiv](https://img.shields.io/badge/arXiv-2008.02217-b31b1b.svg)](https://arxiv.org/abs/2008.02217)
 
 **Give your AI agents real memory.**
@@ -167,6 +167,36 @@ diag = mem.diagnose("topology math")
 print(diag["recommendation"])  # agents decide at runtime
 ```
 
+### "Nothing Matches" Detection
+
+AI agents need to know when a query has no relevant memory -- not just pick the least-bad option. This library solves it with three independent signals combined via a sentinel pattern.
+
+```python
+from hopfield_memory import HopfieldMemory
+
+mem = HopfieldMemory()
+mem.store("The Eiffel Tower is in Paris")
+mem.store("Mount Fuji is in Japan")
+
+# Returns the fact when there's a match
+result = mem.query_or_none("Eiffel Tower Paris")
+print(result)  # "The Eiffel Tower is in Paris"
+
+# Returns None when nothing matches
+result = mem.query_or_none("basketball playoffs score")
+print(result)  # None
+
+# For more detail, inspect the match signals
+mq = mem.match_quality("basketball playoffs score")
+print(mq["max_similarity"])   # ~0.14 (low -- no real word overlap)
+print(mq["is_match"])         # False
+```
+
+Under the hood, the network stores a zero-vector sentinel pattern. Three signals are combined:
+- **max_similarity** -- raw dot product before softmax (the primary signal)
+- **gap** -- attention weight separation between top patterns
+- **sentinel_weight** -- how much attention goes to the "nothing" anchor
+
 ---
 
 ## How It Works (Plain English)
@@ -188,7 +218,7 @@ This section exists because honest documentation matters more than marketing.
 - **Default encoder is bag-of-words.** "dog" and "canine" get zero similarity without `[semantic]` extra.
 - **Contradiction detection is heuristic.** Works best with simple factual statements.
 - **Multi-hop is retrieval chaining, not logical inference.** It finds related facts, not derived conclusions.
-- **Confidence is relative, not absolute.** The network always picks a best match -- it cannot say "nothing matches."
+- **Confidence is relative, not absolute.** Softmax always sums to 1, so `query_with_confidence()` always reports high confidence. Use `query_or_none()` or `has_match()` to detect non-matches.
 - **Adaptive beta is a heuristic.** The convergence proof assumes fixed inverse temperature.
 - **Exponential capacity has conditions.** Requires patterns with sufficient separation in high dimension.
 
@@ -208,7 +238,7 @@ mhn-ai-agent-memory/
     multihop.py               # Chained retrieval
     tiered.py                 # Hot/cold storage for scale
     presets.py                # small/medium/large/massive factories
-  tests/                      # 27 tests
+  tests/                      # 34 tests
   examples/                   # Runnable demos
   benchmarks/                 # A/B: baseline vs repulsive
 ```

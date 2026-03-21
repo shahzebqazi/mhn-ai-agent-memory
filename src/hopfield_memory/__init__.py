@@ -10,7 +10,7 @@ hopfield-memory: AI agent memory using Modern Hopfield Networks.
     result = mem.query("math topology")
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from hopfield_memory.network import ModernHopfieldNetwork
 from hopfield_memory.repulsive import RepulsiveMHN, EnergyComponents

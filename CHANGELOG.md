@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 (2026-03-21)
+
+### Added
+- **"No match" detection** -- the network can now tell agents when nothing in memory matches a query
+- `query_or_none(question)` returns None instead of a forced answer when nothing matches
+- `has_match(question)` boolean check for match existence
+- `match_quality(question)` returns all three detection signals for agent decision-making:
+  - `max_similarity` -- raw dot product before softmax (most reliable signal)
+  - `gap` -- attention weight separation between top two patterns
+  - `sentinel_weight` -- how much attention goes to the null sentinel
+- Sentinel pattern (zero vector) automatically stored on init to anchor the "no match" signal
+- Sentinel excluded from all query results and fact counts
+- 7 new tests for match detection behavior
+
 ## 0.3.0 (2026-03-21)
 
 ### Added

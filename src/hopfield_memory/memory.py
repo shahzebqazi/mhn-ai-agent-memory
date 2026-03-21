@@ -56,6 +56,7 @@ class HopfieldMemory:
         repulsive: bool = False,
         beta_neg: float = 6.0,
         clamp_radius: float = 1.5,
+        sentinel: bool = True,
     ):
         if encoder is not None:
             self.encoder = encoder
@@ -66,6 +67,8 @@ class HopfieldMemory:
 
         effective_dim = self.encoder.dim
         self.repulsive = repulsive
+        self._sentinel = sentinel
+        self._sentinel_idx: int = -1
 
         if repulsive:
             self.network = RepulsiveMHN(
@@ -79,6 +82,11 @@ class HopfieldMemory:
         self.facts: List[str] = []
         self.negative_facts: List[str] = []
 
+        if sentinel:
+            null_vec = np.zeros(effective_dim)
+            self._sentinel_idx = self.network.store(null_vec)
+            self.facts.append("")
+
     def store(self, fact: str) -> int:
         """Store a text fact. Returns the index."""
         vec = self.encoder.encode(fact)
@@ -90,6 +98,7 @@ class HopfieldMemory:
         """Retrieve the top-k most relevant facts for a query.
 
         Returns list of ``(fact_text, attention_weight)`` tuples.
+        The sentinel pattern (if enabled) is excluded from results.
         """
         if not self.facts:
             return []
@@ -98,7 +107,16 @@ class HopfieldMemory:
         _, weights = self.network.retrieve(query_vec)
 
         ranked = sorted(enumerate(weights), key=lambda x: -x[1])
-        return [(self.facts[idx], float(w)) for idx, w in ranked[:top_k]]
+        results = []
+        for idx, w in ranked:
+            if idx == self._sentinel_idx:
+                continue
+            if not self.facts[idx]:
+                continue
+            results.append((self.facts[idx], float(w)))
+            if len(results) >= top_k:
+                break
+        return results
 
     def query(self, question: str) -> str:
         """Single-shot query: return the best matching fact."""
@@ -116,10 +134,92 @@ class HopfieldMemory:
 
     @property
     def num_facts(self) -> int:
-        return len(self.facts)
+        return sum(1 for f in self.facts if f)
 
     def all_facts(self) -> List[str]:
-        return list(self.facts)
+        return [f for f in self.facts if f]
+
+    def match_quality(self, query: str) -> dict:
+        """Assess how well a query matches any stored fact.
+
+        Combines three independent signals:
+
+        1. **max_similarity** -- highest raw dot product between the query
+           vector and any stored pattern (before softmax). This is the most
+           reliable signal: high means shared content, low means no overlap.
+        2. **gap** -- difference between the top two attention weights.
+           Large gap = strong match. Small gap = ambiguous or no match.
+        3. **sentinel_weight** -- attention weight on the null sentinel pattern.
+           High sentinel weight = query is far from all real patterns.
+
+        Returns a dict with all signals plus a boolean ``is_match``.
+        """
+        if not self.facts or self.num_facts == 0:
+            return {
+                "max_similarity": 0.0,
+                "gap": 0.0,
+                "energy": 0.0,
+                "sentinel_weight": 1.0,
+                "top_confidence": 0.0,
+                "is_match": False,
+            }
+
+        query_vec = self.encoder.encode(query)
+        retrieved, weights = self.network.retrieve(query_vec)
+
+        X = self.network._pattern_matrix()
+        raw_sims = X.T @ query_vec
+        real_sims = [float(raw_sims[i]) for i in range(len(self.facts))
+                     if i != self._sentinel_idx and self.facts[i]]
+        max_sim = max(real_sims) if real_sims else 0.0
+
+        sorted_w = np.sort(weights)[::-1]
+        gap = float(sorted_w[0] - sorted_w[1]) if len(sorted_w) > 1 else float(sorted_w[0])
+
+        energy = float(self.network.energy(retrieved))
+
+        sentinel_w = float(weights[self._sentinel_idx]) if self._sentinel_idx >= 0 else 0.0
+
+        is_match = max_sim > 0.25
+
+        return {
+            "max_similarity": max_sim,
+            "gap": gap,
+            "energy": energy,
+            "sentinel_weight": sentinel_w,
+            "top_confidence": float(np.max(weights)),
+            "is_match": is_match,
+        }
+
+    def has_match(self, query: str, min_similarity: float = 0.25) -> bool:
+        """Return True if the query meaningfully matches a stored fact.
+
+        Uses the maximum raw dot product between the query vector and
+        stored patterns as the primary signal. This is computed before
+        the softmax, so it reflects actual content overlap rather than
+        relative ranking.
+
+        Parameters
+        ----------
+        query : str
+            The query text.
+        min_similarity : float
+            Minimum raw cosine similarity to any stored pattern to
+            consider a match genuine. Default 0.25 works well with
+            the RandomIndexEncoder for 5+ stored facts.
+        """
+        mq = self.match_quality(query)
+        return mq["is_match"] and mq["max_similarity"] >= min_similarity
+
+    def query_or_none(self, question: str, min_similarity: float = 0.25) -> Optional[str]:
+        """Return the best matching fact, or None if nothing matches.
+
+        This is the primary method for agents that need to distinguish
+        "I found a relevant memory" from "nothing in memory is relevant."
+        """
+        if not self.has_match(question, min_similarity=min_similarity):
+            return None
+        return self.query(question)
 
     def store_negative(self, fact: str) -> int:
         """Store a negative (repulsive) fact the network should avoid.
