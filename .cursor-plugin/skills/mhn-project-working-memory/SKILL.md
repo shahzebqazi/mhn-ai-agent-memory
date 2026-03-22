@@ -36,4 +36,4 @@ Use `sentence_transformer` (or better encoders) for semantic recall; `random` is
 
 ## Marketplace plugin
 
-Install the local Cursor plugin from `.cursor-plugin/` (see that folder’s `plugin.json`) to ship this skill with the repo; submit the same tree to the Cursor plugin marketplace when ready. The same skill text is kept under `.cursor-plugin/skills/` for packaging (keep both copies aligned if you edit one).
+Install the local Cursor plugin from `.cursor-plugin/` (see that folder’s `plugin.json`) to ship this skill with the repo; submit the same tree to the Cursor plugin marketplace when ready. The same skill text lives under `.cursor/skills/` for repo-open discovery (keep both copies aligned if you edit one).

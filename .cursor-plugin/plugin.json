@@ -20,6 +20,6 @@
     "associative-memory",
     "mhn"
   ],
-  "skills": "../.cursor/skills",
+  "skills": "./skills",
   "commands": ["./commands/hopfield-mcp-setup.md"]
 }
