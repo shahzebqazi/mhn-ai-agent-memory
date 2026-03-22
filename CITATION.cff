@@ -24,6 +24,7 @@ authors:
   - family-names: Qazi
     given-names: Shahzeb
     alias: shahzebqazi
+    email: sqazi@pm.me
 references:
   - type: article
     title: "Hopfield Networks is All You Need"

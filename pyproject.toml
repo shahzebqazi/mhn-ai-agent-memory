@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    { name = "shahzebqazi" },
+    { name = "shahzebqazi", email = "sqazi@pm.me" },
 ]
 keywords = ["hopfield", "modern-hopfield-network", "associative-memory", "attention", "ai-agents", "agent-memory", "context-engineering"]
 classifiers = [
