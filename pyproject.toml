@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mhn-ai-agent-memory"
-version = "0.4.0"
+version = "1.0.0"
 description = "AI agent memory system powered by Modern Hopfield Networks — no LLM calls, no database, one matrix multiply"
 readme = "README.md"
 license = "MIT"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["hopfield", "modern-hopfield-network", "associative-memory", "attention", "ai-agents", "agent-memory", "context-engineering"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",

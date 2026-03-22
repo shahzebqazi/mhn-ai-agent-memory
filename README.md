@@ -6,7 +6,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-34%20passing-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-43%20passing-brightgreen.svg)](#development)
 [![arXiv](https://img.shields.io/badge/arXiv-2008.02217-b31b1b.svg)](https://arxiv.org/abs/2008.02217)
 
 **Give your AI agents real memory.**
@@ -238,7 +238,7 @@ mhn-ai-agent-memory/
     multihop.py               # Chained retrieval
     tiered.py                 # Hot/cold storage for scale
     presets.py                # small/medium/large/massive factories
-  tests/                      # 34 tests
+  tests/                      # 43 tests
   examples/                   # Runnable demos
   benchmarks/                 # A/B: baseline vs repulsive
 ```
