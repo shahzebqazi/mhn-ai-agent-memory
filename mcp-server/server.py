@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SRC = _REPO_ROOT / "src"
@@ -52,16 +52,43 @@ def _build_memory() -> HopfieldMemory:
     return HopfieldMemory(encoder=_make_encoder(), beta=beta, repulsive=repulsive)
 
 
-_memory: HopfieldMemory = _build_memory()
+def _state_path() -> Optional[Path]:
+    raw = os.environ.get("HOPFIELD_STATE_PATH", "").strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser().resolve()
+
+
+def _initial_memory() -> HopfieldMemory:
+    """Fresh memory, or load from HOPFIELD_STATE_PATH when that file exists."""
+    path = _state_path()
+    if path is not None and path.is_file():
+        return HopfieldMemory.load(str(path), encoder=_make_encoder())
+    return _build_memory()
+
+
+def _persist_if_configured() -> None:
+    if not _env_bool("HOPFIELD_AUTO_SAVE", False):
+        return
+    path = _state_path()
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _memory.save(str(path))
+
+
+_memory: HopfieldMemory = _initial_memory()
 
 
 @mcp.tool()
 def store(fact: str) -> int:
-    return _memory.store(fact)
+    idx = _memory.store(fact)
+    _persist_if_configured()
+    return idx
 
 
 @mcp.tool()
-def retrieve(query: str, top_k: int = 3) -> List[List[Any]]:
+def retrieve(query: str, top_k: int = 3) -> list[list[Any]]:
     pairs = _memory.retrieve(query, top_k=top_k)
     return [[fact, weight] for fact, weight in pairs]
 
@@ -78,7 +105,9 @@ def query_or_none(question: str, min_similarity: float = 0.25) -> Optional[str]:
 
 @mcp.tool()
 def store_negative(fact: str) -> int:
-    return _memory.store_negative(fact)
+    idx = _memory.store_negative(fact)
+    _persist_if_configured()
+    return idx
 
 
 @mcp.tool()
@@ -97,6 +126,25 @@ def load(path: str) -> dict:
     global _memory
     _memory = HopfieldMemory.load(path, encoder=_make_encoder())
     return {"path": path, "num_facts": _memory.num_facts}
+
+
+@mcp.tool()
+def list_facts() -> list[str]:
+    """Return all stored fact strings (empty if none). Same file is shared across agents when using HOPFIELD_STATE_PATH."""
+    return _memory.all_facts()
+
+
+@mcp.tool()
+def working_memory_status() -> dict:
+    """Report persistence path, whether it exists on disk, fact count, and encoder kind."""
+    path = _state_path()
+    return {
+        "state_path": str(path) if path else None,
+        "state_path_exists": path.is_file() if path else False,
+        "auto_save": _env_bool("HOPFIELD_AUTO_SAVE", False),
+        "num_facts": _memory.num_facts,
+        "encoder": os.environ.get("HOPFIELD_ENCODER", "random").strip().lower() or "random",
+    }
 
 
 def main() -> None:

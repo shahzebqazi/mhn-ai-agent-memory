@@ -9,6 +9,7 @@ build/
 *.faiss
 *.npy
 agent_memory.json
+.mhn/
 .venv/
 .ruff_cache/
 .pytest_cache/

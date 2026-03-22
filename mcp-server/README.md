@@ -35,6 +35,8 @@ pip install -e .
 | `HOPFIELD_REPULSIVE` | `false` | Enable repulsive / contrastive backend (`true` / `1` / `yes`) |
 | `HOPFIELD_ENCODER` | `random` | `random`, `auto`, `sentence_transformer`, `tfidf`, `openai` |
 | `HOPFIELD_ST_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model name when using `sentence_transformer` |
+| `HOPFIELD_STATE_PATH` | *(unset)* | If set, load this file on server startup when it exists (shared disk-backed working memory for multiple agents / sessions) |
+| `HOPFIELD_AUTO_SAVE` | `false` | If `true`/`1`/`yes`, persist to `HOPFIELD_STATE_PATH` after each `store` / `store_negative` (requires `HOPFIELD_STATE_PATH`) |
 
 ## Cursor
 
@@ -49,7 +51,9 @@ Add a server entry to your MCP config (user-level `~/.cursor/mcp.json` or projec
       "env": {
         "HOPFIELD_DIM": "512",
         "HOPFIELD_BETA": "10.0",
-        "HOPFIELD_REPULSIVE": "false"
+        "HOPFIELD_REPULSIVE": "false",
+        "HOPFIELD_STATE_PATH": "/absolute/path/to/your/project/.mhn/working-memory.json",
+        "HOPFIELD_AUTO_SAVE": "true"
       }
     }
   }
@@ -87,6 +91,8 @@ Example `claude_desktop_config.json` (macOS: `~/Library/Application Support/Clau
 | `match_quality` | `query: str` → signal dict (`max_similarity`, `gap`, `is_match`, …) |
 | `save` | `path: str` → `{"path", "num_facts"}` |
 | `load` | `path: str` → reloads global memory; `{"path", "num_facts"}` |
+| `list_facts` | → all stored fact strings (browse / audit shared working memory) |
+| `working_memory_status` | → `state_path`, `state_path_exists`, `auto_save`, `num_facts`, `encoder` |
 
 ## Example agent flow
 
@@ -94,6 +100,8 @@ Example `claude_desktop_config.json` (macOS: `~/Library/Application Support/Clau
 2. **`retrieve`** with `query`: “what color do they like?” and `top_k`: `3` — ranked facts with attention weights.
 3. **`query_or_none`** with the same question — returns the fact or `null` if similarity is below `min_similarity`.
 4. **`save`** to `/tmp/agent_memory.json` before shutdown; on next session **`load`** that path to restore.
+
+**Shared project working memory:** set `HOPFIELD_STATE_PATH` to a JSON file inside the repo (for example `.mhn/working-memory.json`), and `HOPFIELD_AUTO_SAVE=true`. Every Cursor agent using the same MCP config reads/writes the same file, so memory swaps with the project, not with a single chat. Use **`list_facts`** to list everything on disk; **`working_memory_status`** to confirm the path and encoder.
 
 Run manually (stdio MCP transport):
 

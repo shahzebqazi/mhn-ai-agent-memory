@@ -54,3 +54,7 @@ pythonpath = ["src"]
 [tool.ruff.lint]
 select = ["E", "F", "UP", "B", "SIM", "I"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# sys.path bootstrap before hopfield_memory (sibling src layout)
+"mcp-server/server.py" = ["E402"]
