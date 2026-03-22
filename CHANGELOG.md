@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.0 (2026-03-21)
+
+### Fixed
+- **Save/load sentinel duplication**: `load()` no longer creates a duplicate sentinel
+  pattern; `save()` now persists sentinel metadata with backward-compatible legacy
+  inference (checks both `facts[0]==""` and `patterns[0]` all-zero)
+- **Cross-process encoder determinism**: `RandomIndexEncoder` and `TFIDFEncoder`
+  fallback use `hashlib.sha256` instead of Python's per-process-salted `hash()`
+- **Energy/dynamics consistency**: `energy()` and `RepulsiveMHN.energy_components()`
+  now use the state-dependent beta when `adaptive_beta` is enabled, matching
+  `retrieve()` dynamics; accepts optional `beta` parameter for explicit control
+- **Match predicate alignment**: `is_match` and `has_match` now incorporate all
+  three documented signals (similarity, gap, sentinel weight) with consistent
+  `>=` threshold
+- **OpenAI encoder dimension**: Accepts optional `dim` override; uses known-model
+  lookup instead of fragile substring heuristic
+
+### Added
+- 9 new tests (43 total): save/load roundtrip variants, encoder determinism,
+  softmax weight properties, convex combination norm bound, pattern/fact count
+  invariant after load
+- MCP server (`mcp-server/`) for Cursor, Claude Code, and other MCP-compatible
+  AI coding agents
+- `llms.txt` and `llms-full.txt` for AI agent discoverability
+- `CITATION.cff` for academic citation
+- GitHub Pages blog post at `docs/`
+
+### Changed
+- Encoder ABC docstring clarifies empty text returns the zero vector
+- `test_capacity_with_noisy_queries` explicitly uses `adaptive_beta=False`
+  for theory-aligned capacity measurement
+- Development Status classifier bumped to Beta
+- Version bump to 1.0.0
+
 ## 0.4.0 (2026-03-21)
 
 ### Added

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Replacing RAG with a Hopfield Network: Agent Memory in One Matrix Multiply</title>
+  <meta name="description" content="Modern Hopfield networks expose transformer-style attention as deterministic associative memory: one matrix multiply, no LLM wrapper, with explicit match quality and sentinel-based abstention.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Replacing RAG with a Hopfield Network: Agent Memory in One Matrix Multiply">
+  <meta property="og:description" content="Associative memory for AI agents using the Modern Hopfield update rule: same structure as one step of attention, microseconds of latency, built-in confidence and no-match detection.">
+  <meta property="og:url" content="https://shahzebqazi.github.io/mhn-ai-agent-memory/">
+  <meta property="og:site_name" content="mhn-ai-agent-memory">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Replacing RAG with a Hopfield Network: Agent Memory in One Matrix Multiply">
+  <meta name="twitter:description" content="One equation, one matrix multiply: explicit Hopfield memory for agents without an LLM retrieval layer.">
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-elevated: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --code-bg: #21262d;
+      --keyword: #ff7b72;
+      --string: #a5d6ff;
+      --comment: #8b949e;
+      --function: #d2a8ff;
+      --number: #79c0ff;
+      --maxw: 720px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 17px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 0 1.25rem 3rem;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+      font-feature-settings: "kern" 1, "liga" 1;
+    }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+    }
+
+    header.site {
+      padding: 2.5rem 0 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .repo-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      padding: 0.5rem 0.9rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+
+    .repo-cta a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .repo-cta a:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    h1 {
+      font-size: clamp(1.55rem, 4vw, 2rem);
+      font-weight: 600;
+      line-height: 1.25;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .lede {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      margin: 0;
+      max-width: 38em;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin: 2.25rem 0 0.75rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+      letter-spacing: -0.01em;
+    }
+
+    h2:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    p {
+      margin: 0 0 1rem;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+    }
+
+    strong {
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+
+    .equation {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      overflow-x: auto;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .equation sub {
+      font-size: 0.75em;
+    }
+
+    pre.code {
+      margin: 1.25rem 0;
+      padding: 1rem 1.15rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.55;
+    }
+
+    pre.code code {
+      font-family: inherit;
+      background: none;
+      padding: 0;
+    }
+
+    .kw { color: var(--keyword); }
+    .fn { color: var(--function); }
+    .st { color: var(--string); }
+    .cm { color: var(--comment); font-style: italic; }
+    .nm { color: var(--number); }
+
+    ul {
+      margin: 0 0 1rem;
+      padding-left: 1.35rem;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table.compare {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    table.compare th,
+    table.compare td {
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    table.compare th {
+      background: var(--bg-elevated);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    table.compare tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.compare td:first-child {
+      font-weight: 500;
+      color: #c9d1d9;
+      white-space: nowrap;
+    }
+
+    aside.note {
+      margin: 1.5rem 0;
+      padding: 1rem 1.15rem;
+      background: var(--bg-elevated);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    aside.note strong {
+      color: var(--text);
+    }
+
+    footer.site {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    footer.site a {
+      font-weight: 500;
+    }
+
+    @media (max-width: 540px) {
+      body {
+        padding: 0 1rem 2.5rem;
+        font-size: 16px;
+      }
+
+      header.site {
+        padding-top: 1.5rem;
+      }
+
+      table.compare {
+        font-size: 0.82rem;
+      }
+
+      table.compare th,
+      table.compare td {
+        padding: 0.5rem 0.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="site">
+      <p class="repo-cta">
+        <span style="color:var(--text-muted)">Source:</span>
+        <a href="https://github.com/shahzebqazi/mhn-ai-agent-memory">github.com/shahzebqazi/mhn-ai-agent-memory</a>
+      </p>
+      <h1>Replacing RAG with a Hopfield Network: Agent Memory in One Matrix Multiply</h1>
+      <p class="lede">Modern Hopfield dynamics give you transformer-shaped memory without paying for retrieval-time LLM calls. Here is what that buys you, how the math maps to code, and where the approach stops being enough.</p>
+    </header>
+
+    <article>
+      <h2>1. The problem</h2>
+      <p>Most agent stacks treat long-term memory as a thin layer over text storage. You chunk documents, embed them, write rows to a database, and when the agent needs context you assemble a prompt and ask a language model to interpret what is relevant. That pattern works until you count the costs: every turn can trigger a model call, latency is measured in seconds, sampling makes behavior non-deterministic, and the model can confidently narrate relationships that never existed in the store. You are not retrieving a fact; you are asking another model to <em>reconstruct</em> one.</p>
+      <p>For many tool-using agents, what you actually want is simpler: given a cue, return the closest stored association, with a score that means something operationally, and abstain when nothing in memory should drive a decision. That is associative memory, not open-ended generation.</p>
+      <p>RAG and LLM-mediated recall still matter when the task is summarization, synthesis across sources, or language-conditioned planning. This post is not arguing that you should delete your vector store everywhere. It is arguing that a large class of "remember this fact and fetch it later" behaviors can be implemented as a small numeric primitive with predictable failure modes, which is easier to test and cheaper to run at high frequency.</p>
+
+      <h2>2. The insight</h2>
+      <p>Ramsauer et al. (2021), in <a href="https://arxiv.org/abs/2008.02217">Hopfield Networks is All You Need</a>, showed that the update rule of a Modern Hopfield Network (MHN) lines up with the structure of a single step of transformer attention when keys and values are tied in a particular way. Intuitively, attention already <em>is</em> a soft winner-take-most combination of stored vectors conditioned on a query. Exposing that operation directly gives you an explicit memory module: fixed rules, no wrapper model, and outputs you can test.</p>
+      <p>The <a href="https://github.com/shahzebqazi/mhn-ai-agent-memory">mhn-ai-agent-memory</a> package implements that idea for text-backed agents. Facts are encoded to vectors and held in a matrix; a query vector runs the same relaxation step you would recognize from attention, and you read back the winning pattern and its weight.</p>
+      <p>Keeping the operation explicit matters for systems engineering. You can log the weight vector, freeze the encoder, snapshot the pattern matrix, and write property tests that assert "this cue must not retrieve that fact." Wrapping the same geometry inside an LLM turns those guarantees into prompt engineering and post-hoc evaluation.</p>
+
+      <h2>3. How it works</h2>
+      <p>Let the rows of matrix <span style="font-family:ui-monospace,monospace">X</span> be stored patterns (each row is one memory). Let <span style="font-family:ui-monospace,monospace">xi</span> be the query embedding. With inverse temperature <span style="font-family:ui-monospace,monospace">beta</span>, one synchronous update is:</p>
+      <div class="equation" role="math" aria-label="Modern Hopfield update">
+        <strong>xi<sub>new</sub></strong> = <strong>X</strong> @ softmax( <strong>beta</strong> * <strong>X</strong><sup>T</sup> @ <strong>xi</strong> )
+      </div>
+      <p>In plain language: compare the cue to every stored vector, turn similarities into nonnegative weights that sum to one, then take the weighted sum of the memories. The system relaxes toward whichever stored patterns the cue aligns with; with a large enough <span style="font-family:ui-monospace,monospace">beta</span>, the softmax sharpens and the output tracks the nearest attractor. Capacity in high dimension scales far better than naive linear readout under separation assumptions on the patterns, which is why this family of models is interesting next to brute-force nearest-neighbor lists.</p>
+      <p>The reference implementation wraps numerics and text encoding. A minimal store and retrieve loop looks like this:</p>
+      <pre class="code"><code><span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="cm"># Patterns as rows of X (L2-normalized is typical in practice)</span>
+X = np.array([
+    [<span class="nm">1.0</span>, <span class="nm">0.0</span>, <span class="nm">0.0</span>],
+    [<span class="nm">0.0</span>, <span class="nm">1.0</span>, <span class="nm">0.0</span>],
+], dtype=np.float64)
+beta = <span class="nm">8.0</span>
+xi = np.array([<span class="nm">0.9</span>, <span class="nm">0.1</span>, <span class="nm">0.0</span>])
+
+logits = beta * (X @ xi)
+w = np.exp(logits - np.max(logits))
+w /= w.sum()
+xi_new = w @ X
+
+<span class="cm"># xi_new is pulled toward the first stored pattern</span></code></pre>
+      <p>The library packages the same computation with encoders, optional iteration, and agent-facing APIs on top of <span style="font-family:ui-monospace,monospace">HopfieldMemory</span>. In multi-step mode you apply the update repeatedly until the state stabilizes, which is the direct analogue of letting an attention block settle while keeping weights tied to the stored memory bank.</p>
+
+      <h2>4. What makes this different from a vector database</h2>
+      <p>Nearest-neighbor search in a vector database returns a ranked list under a fixed metric. That is static geometry: you ask for the top-<span style="font-family:ui-monospace,monospace">k</span> and you get it. The Hopfield step is dynamical: the query defines an energy landscape over stored patterns and the softmax-weighted combination is one relaxation toward an attractor. In practice you still store vectors in a matrix, but the readout rule is not the same as returning cosine neighbors.</p>
+      <p>Softmax weights are a built-in confidence structure: when one pattern dominates, its weight approaches one. When the landscape is flat, weights spread and the combined state is an ambiguous blend. That is different from a distance threshold on a single neighbor, where you must invent a separate notion of "far enough to ignore."</p>
+      <p>Finally, the exponential-capacity story belongs to the MHN family under stated conditions (high dimension, pattern separation). A flat index over embeddings scales linearly in the number of stored items for exact search; the theoretical contrast is about representational capacity per dimension, not a claim that your laptop suddenly stores infinite facts.</p>
+      <p>In deployment you may still use an ANN index for cold storage at millions of patterns; the library's tiered presets combine a hot Hopfield layer for exact microsecond reads with approximate search for archival rows. The conceptual distinction remains: the readout rule is Hopfield relaxation (optionally with repulsive terms), not merely "return top-1 cosine neighbor" unless you choose a code path that does exactly that.</p>
+
+      <div class="table-wrap">
+        <table class="compare" aria-label="Traditional LLM plus database versus Hopfield memory library">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Traditional (LLM + DB)</th>
+              <th scope="col">This library</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Retrieval</td>
+              <td>LLM API call</td>
+              <td>One matrix multiply (per step)</td>
+            </tr>
+            <tr>
+              <td>Latency</td>
+              <td>Seconds</td>
+              <td>Microseconds (numpy-scale)</td>
+            </tr>
+            <tr>
+              <td>Cost</td>
+              <td>Per token</td>
+              <td>Zero after storage</td>
+            </tr>
+            <tr>
+              <td>Determinism</td>
+              <td>Non-deterministic (sampling, provider drift)</td>
+              <td>Deterministic given fixed encoder and parameters</td>
+            </tr>
+            <tr>
+              <td>Capacity</td>
+              <td>Depends on embedding quality and chunking</td>
+              <td>Exponential in dimension under MHN assumptions (proven)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>5. The "nothing matches" problem</h2>
+      <p>Agents need to know when memory should stay silent. Softmax always produces a full probability vector over patterns, so a naive attention readout always commits to <em>some</em> blend of memories, even when every option is a poor match. That is the same structural issue you see when a chat model picks the least-bad span from retrieved chunks.</p>
+      <p>The library addresses this with three signals used together: <strong>max_similarity</strong> (raw alignment before softmax), <strong>gap</strong> (separation between the top attention masses), and <strong>sentinel_weight</strong> (mass assigned to a learned or fixed "no match" anchor pattern, implemented as a zero-vector sentinel in the store). When those signals disagree with a confident retrieval, the API returns no result instead of a hallucinated association.</p>
+      <p>None of the three signals is sufficient alone. High max similarity with a tiny gap means two memories are fighting for attention; low max similarity with a razor-thin gap can still be noise. The sentinel absorbs probability mass when the query is orthogonal to real content, so "I have nothing" becomes a first-class attractor instead of an afterthought threshold. Together they give agents a principled abstention path that stays aligned with the same softmax machinery used for retrieval.</p>
+      <pre class="code"><code><span class="kw">from</span> hopfield_memory <span class="kw">import</span> HopfieldMemory
+
+mem = HopfieldMemory()
+mem.store(<span class="st">"The Eiffel Tower is in Paris"</span>)
+mem.store(<span class="st">"Mount Fuji is in Japan"</span>)
+
+<span class="cm"># Match when the cue aligns with stored text</span>
+<span class="fn">print</span>(mem.query_or_none(<span class="st">"Eiffel Tower Paris"</span>))
+
+<span class="cm"># None when nothing in memory should fire</span>
+<span class="fn">print</span>(mem.query_or_none(<span class="st">"basketball playoffs score"</span>))
+
+mq = mem.match_quality(<span class="st">"basketball playoffs score"</span>)
+<span class="cm"># mq["max_similarity"], mq["is_match"], etc.</span></code></pre>
+      <p>For production agents, treat <span style="font-family:ui-monospace,monospace">query_or_none</span> as the conservative default when a tool call should be gated on epistemic state, and use <span style="font-family:ui-monospace,monospace">query_with_confidence</span> only when you understand that softmax mass is not calibrated like a probabilistic classifier.</p>
+
+      <h2>6. Repulsive attention for faster convergence</h2>
+      <p>When memories are nearby in embedding space, relaxation can linger in a shallow basin. Optional repulsive attention adds negative patterns that contribute contrastive energy: they act like hills that push the state off confusable regions. Benchmarks in the repository report materially fewer steps to convergence in some regimes (on the order of an order of magnitude in documented experiments). It is an opt-in knob, not a second network, and diagnostics on the memory object expose when agents might want to enable it.</p>
+      <p>You declare negative or confusable exemplars with the same API surface you use for ordinary storage, and the repulsive module shapes the energy landscape without changing the basic matrix-multiply skeleton. That keeps the mental model small: positives define wells, negatives define ridges, and the query still flows through softmax-weighted aggregation.</p>
+
+      <h2>7. Getting started</h2>
+      <pre class="code"><code>pip install mhn-ai-agent-memory</code></pre>
+      <pre class="code"><code><span class="kw">from</span> hopfield_memory <span class="kw">import</span> HopfieldMemory
+
+mem = HopfieldMemory()
+mem.store(<span class="st">"Alice studies topology"</span>)
+fact, conf = mem.query_with_confidence(<span class="st">"topology"</span>)
+<span class="cm"># fact: stored string; conf: softmax-style weight</span></code></pre>
+      <p>Optional extras install semantic encoders, OpenAI embeddings, or FAISS-backed scale presets. For example: <span style="font-family:ui-monospace,monospace">pip install mhn-ai-agent-memory[semantic]</span> pulls sentence-transformers for higher-quality text geometry; <span style="font-family:ui-monospace,monospace">[openai]</span> wires the OpenAI embedding API; <span style="font-family:ui-monospace,monospace">[scale]</span> adds FAISS for large cold stores; <span style="font-family:ui-monospace,monospace">[all]</span> installs the full matrix. The <a href="https://github.com/shahzebqazi/mhn-ai-agent-memory">repository README</a> lists encoder tradeoffs and factory presets (<span style="font-family:ui-monospace,monospace">small_memory</span>, <span style="font-family:ui-monospace,monospace">large_memory</span>, <span style="font-family:ui-monospace,monospace">massive_memory</span>) if you outgrow a single in-memory matrix.</p>
+
+      <aside class="note">
+        <strong>Limitations, briefly.</strong> Default text encoding is bag-of-words unless you add a semantic extra, so synonyms can look unrelated. Contradiction handling and multi-hop chaining are heuristics layered on retrieval, not full logical inference. Confidence from softmax is relative; prefer <span style="font-family:ui-monospace,monospace">query_or_none</span> or explicit match-quality fields when abstention matters. Adaptive inverse temperature departs from the fixed-<span style="font-family:ui-monospace,monospace">beta</span> theory. Exponential capacity requires sufficiently separated patterns in sufficiently high dimension. None of that invalidates the core trade: you can ship a deterministic, inspectable memory primitive where an LLM used to sit in the loop.
+      </aside>
+    </article>
+
+    <footer class="site">
+      <p>MIT licensed. Modern Hopfield reference: Ramsauer et al., ICLR 2021. Code and tests: <a href="https://github.com/shahzebqazi/mhn-ai-agent-memory">mhn-ai-agent-memory on GitHub</a>. PyPI package name: <span style="font-family:ui-monospace,monospace">mhn-ai-agent-memory</span>.</p>
+    </footer>
+  </div>
+</body>
+</html>

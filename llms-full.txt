@@ -1,0 +1,211 @@
+# MHN AI Agent Memory — Full API Reference
+
+> Associative memory for AI agents using Modern Hopfield Networks.
+> No LLM calls, no database, one matrix multiply.
+
+## Installation
+
+```
+pip install mhn-ai-agent-memory
+pip install mhn-ai-agent-memory[semantic]   # sentence-transformers
+pip install mhn-ai-agent-memory[openai]     # OpenAI embeddings
+pip install mhn-ai-agent-memory[scale]      # FAISS for million-scale
+pip install mhn-ai-agent-memory[all]        # everything
+```
+
+---
+
+## HopfieldMemory
+
+The primary user-facing class. Stores text facts and retrieves them via Modern Hopfield Network dynamics.
+
+### Constructor
+
+```python
+HopfieldMemory(
+    encoder: Optional[Encoder] = None,   # text encoder; auto-selects if None
+    dim: Optional[int] = None,           # shortcut to create RandomIndexEncoder(dim=dim)
+    beta: float = 10.0,                  # base inverse temperature
+    adaptive_beta: bool = True,          # per-query adaptive beta
+    repulsive: bool = False,             # use RepulsiveMHN backend
+    beta_neg: float = 6.0,              # repulsive inverse temperature
+    clamp_radius: float = 1.5,          # max state norm (repulsive only)
+    sentinel: bool = True,              # store zero-vector sentinel for "no match" detection
+)
+```
+
+### Methods
+
+#### store(fact: str) -> int
+Store a text fact. Returns the pattern index.
+
+#### retrieve(query: str, top_k: int = 3) -> List[Tuple[str, float]]
+Retrieve top-k most relevant facts. Returns `(fact_text, attention_weight)` tuples.
+Sentinel pattern is excluded from results.
+
+#### query(question: str) -> str
+Single-shot query. Returns the best matching fact, or `"[No facts stored]"` if empty.
+
+#### query_with_confidence(question: str) -> Tuple[str, float]
+Returns `(best_fact, confidence_score)`.
+
+#### query_or_none(question: str, min_similarity: float = 0.25) -> Optional[str]
+Returns the best matching fact, or `None` if nothing matches.
+Primary method for agents that need to distinguish "found a memory" from "nothing relevant."
+
+#### has_match(query: str, min_similarity: float = 0.25) -> bool
+Returns True if the query meaningfully matches a stored fact.
+Uses three signals: max dot product >= min_similarity, attention gap > 0.01, sentinel weight < 0.5.
+
+#### match_quality(query: str) -> dict
+Returns all match detection signals:
+- `max_similarity`: float — highest dot product between query and any stored pattern
+- `gap`: float — difference between top two attention weights
+- `energy`: float — Hopfield energy at the retrieved state
+- `sentinel_weight`: float — attention mass on the null sentinel
+- `top_confidence`: float — maximum softmax weight
+- `is_match`: bool — combined three-signal predicate
+
+#### store_negative(fact: str) -> int
+Store a negative (repulsive) pattern. Only works when `repulsive=True`. Returns -1 if not in repulsive mode.
+
+#### diagnose(query: str, num_steps: int = 50, eps: float = 1e-6) -> dict
+Measure convergence speed for a query. Returns:
+- `steps`: int — iterations to converge
+- `converged`: bool
+- `final_confidence`: float
+- `repulsive`: bool
+- `recommendation`: str — actionable guidance for agents
+
+#### save(path: str)
+Serialize memory to a JSON file. Persists patterns, facts, sentinel state, and repulsive patterns.
+
+#### load(path: str, encoder: Optional[Encoder] = None) -> HopfieldMemory [classmethod]
+Deserialize from JSON. Pass the same encoder type used at save time for full quality.
+
+#### num_facts -> int [property]
+Count of stored facts (excludes sentinel).
+
+#### all_facts() -> List[str]
+All stored fact strings (excludes sentinel).
+
+---
+
+## ModernHopfieldNetwork
+
+Low-level network implementing the Ramsauer et al. (2021) update rule.
+
+### Constructor
+
+```python
+ModernHopfieldNetwork(dim: int, beta: float = 8.0, adaptive_beta: bool = True)
+```
+
+### Methods
+
+#### store(pattern: np.ndarray) -> int
+Store a d-dimensional pattern vector.
+
+#### retrieve(query: np.ndarray, num_steps: int = 1) -> Tuple[np.ndarray, np.ndarray]
+Run the Hopfield update. Returns `(retrieved_pattern, attention_weights)`.
+
+#### energy(state: np.ndarray, beta: Optional[float] = None) -> float
+Compute Hopfield energy. Uses state-dependent beta when adaptive_beta=True and beta is None.
+
+---
+
+## RepulsiveMHN(ModernHopfieldNetwork)
+
+Extends MHN with negative/repulsive patterns for contrastive attention.
+
+### Additional Constructor Args
+- `beta_neg: float = 4.0` — inverse temperature for repulsive term
+- `clamp_radius: float = 1.0` — max state norm after update
+
+### Additional Methods
+
+#### store_negative(pattern: np.ndarray) -> int
+Store a negative pattern.
+
+#### energy_components(state: np.ndarray) -> EnergyComponents
+Returns `EnergyComponents(positive, negative, quadratic, total)`.
+
+---
+
+## Encoders
+
+All encoders implement the `Encoder` ABC with `.dim` property and `.encode(text) -> np.ndarray`.
+
+### RandomIndexEncoder(dim: int = 512)
+Bag-of-words with deterministic random word vectors via SHA-256 seeding.
+Zero external dependencies. Low semantic quality.
+
+### TFIDFEncoder(dim: int = 512)
+TF-IDF + SVD. Requires scikit-learn. Medium quality.
+Auto-fits on first 5 texts if unfitted.
+
+### SentenceTransformerEncoder(model_name: str = "all-MiniLM-L6-v2")
+High quality semantic embeddings. Requires sentence-transformers (~80MB model).
+
+### OpenAIEncoder(model: str = "text-embedding-3-small", api_key: Optional[str] = None, dim: Optional[int] = None)
+Highest quality. Requires openai SDK + API key.
+
+### auto_encoder(preferred_dim: Optional[int] = None) -> Encoder
+Returns the best available encoder: SentenceTransformer > TFIDF > RandomIndex.
+
+---
+
+## Contradiction Detection
+
+### ContradictionDetector(similarity_threshold: float = 0.80, top_k: int = 3)
+Detects when a new fact conflicts with an existing one.
+
+#### check(new_fact, new_vec, existing_facts, existing_patterns) -> ConflictResult
+Returns `ConflictResult(has_conflict, new_fact, conflicting_facts, explanation)`.
+
+### check_and_store(memory, fact, detector=None, auto_resolve=False) -> Tuple[int, Optional[ConflictResult]]
+Store with optional contradiction checking. If auto_resolve=True, replaces conflicting facts.
+
+---
+
+## Multi-Hop Retrieval
+
+### chain_query(memory, question: str, max_hops: int = 3) -> List[str]
+Chain queries by augmenting with retrieved context. Returns facts in hop order.
+
+### chain_query_with_confidence(memory, question, max_hops=3, min_confidence=0.1) -> List[Tuple[str, float]]
+Like chain_query but returns (fact, confidence) tuples. Stops when confidence drops.
+
+---
+
+## Tiered Storage
+
+### TieredMemory(encoder=None, beta=10.0, adaptive_beta=True, max_hot=5000, cold_path=None, confidence_threshold=0.5, cold_top_k=20)
+Hot (exact Hopfield, RAM) + cold (FAISS or numpy ANN, disk) tiers.
+
+#### store(fact: str) -> int
+#### retrieve(query: str, top_k=3) -> List[RetrievalResult]
+#### query(question: str) -> str
+#### save(directory: str) / load(directory: str)
+
+### RetrievalResult
+Dataclass with `fact: str`, `confidence: float`, `source: str` ("hot"/"cold"), `index: int`.
+
+---
+
+## Presets
+
+```python
+small_memory(encoder=None) -> HopfieldMemory     # ~100 facts, dim=256, beta=12
+medium_memory(encoder=None) -> HopfieldMemory     # ~10k facts, dim=384, beta=10
+large_memory(encoder=None, cold_path=None) -> TieredMemory   # ~100k facts
+massive_memory(encoder=None, cold_path=None) -> TieredMemory  # millions, FAISS
+```
+
+---
+
+## Links
+
+- Source: https://github.com/shahzebqazi/mhn-ai-agent-memory
+- PyPI: https://pypi.org/project/mhn-ai-agent-memory/
+- Paper: https://arxiv.org/abs/2008.02217 (Ramsauer et al., 2021)

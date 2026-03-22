@@ -1,0 +1,67 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "MHN AI Agent Memory"
+abstract: >-
+  Associative memory for AI agents using Modern Hopfield Networks.
+  Replaces LLM-plus-database memory pipelines with a single matrix multiply
+  backed by the Ramsauer et al. (2021) update rule.
+version: 1.0.0
+date-released: "2026-03-21"
+license: MIT
+repository-code: "https://github.com/shahzebqazi/mhn-ai-agent-memory"
+url: "https://shahzebqazi.github.io/mhn-ai-agent-memory/"
+keywords:
+  - modern-hopfield-network
+  - associative-memory
+  - ai-agents
+  - agent-memory
+  - attention-mechanism
+  - transformer
+  - energy-based-models
+  - context-engineering
+authors:
+  - family-names: Qazi
+    given-names: Shahzeb
+    alias: shahzebqazi
+references:
+  - type: article
+    title: "Hopfield Networks is All You Need"
+    authors:
+      - family-names: Ramsauer
+        given-names: Hubert
+      - family-names: Schäfl
+        given-names: Bernhard
+      - family-names: Lehner
+        given-names: Johannes
+      - family-names: Seidl
+        given-names: Philipp
+      - family-names: Widrich
+        given-names: Michael
+      - family-names: Adler
+        given-names: Thomas
+      - family-names: Gruber
+        given-names: Lukas
+      - family-names: Holzleitner
+        given-names: Markus
+      - family-names: Pavlović
+        given-names: Milena
+      - family-names: Sandve
+        given-names: Geir Kjetil
+      - family-names: Greiff
+        given-names: Victor
+      - family-names: Kreil
+        given-names: David
+      - family-names: Kopp
+        given-names: Michael
+      - family-names: Klambauer
+        given-names: Günter
+      - family-names: Brandstetter
+        given-names: Johannes
+      - family-names: Hochreiter
+        given-names: Sepp
+    year: 2021
+    journal: "International Conference on Learning Representations (ICLR)"
+    identifiers:
+      - type: other
+        value: "arXiv:2008.02217"

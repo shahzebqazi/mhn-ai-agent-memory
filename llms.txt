@@ -1,0 +1,72 @@
+# MHN AI Agent Memory
+
+> Associative memory for AI agents using Modern Hopfield Networks. No LLM calls, no database, one matrix multiply.
+
+## Overview
+
+This library replaces the "store text in DB + call LLM" pipeline with the Modern Hopfield Network update rule — the same mathematical structure as transformer attention, exposed as an explicit, controllable memory system.
+
+- Store text facts as patterns in an energy landscape
+- Query with a partial cue; the network relaxes to the nearest stored pattern
+- Microsecond retrieval, deterministic, zero cost after storage
+- Exponential capacity in dimension (proven by Ramsauer et al., 2021)
+
+## Install
+
+```
+pip install mhn-ai-agent-memory
+```
+
+## Quick Start
+
+```python
+from hopfield_memory import HopfieldMemory
+
+mem = HopfieldMemory()
+mem.store("Alice is a mathematician who studies topology")
+mem.store("Bob is a painter who works with oil on canvas")
+
+fact, confidence = mem.query_with_confidence("topology math")
+# -> ("Alice is a mathematician who studies topology", 0.9999)
+```
+
+## Core API
+
+- `HopfieldMemory(encoder=None, beta=10.0, adaptive_beta=True, repulsive=False, sentinel=True)`
+- `mem.store(fact: str) -> int`
+- `mem.retrieve(query: str, top_k=3) -> List[Tuple[str, float]]`
+- `mem.query(question: str) -> str`
+- `mem.query_or_none(question: str, min_similarity=0.25) -> Optional[str]`
+- `mem.query_with_confidence(question: str) -> Tuple[str, float]`
+- `mem.has_match(query: str, min_similarity=0.25) -> bool`
+- `mem.match_quality(query: str) -> dict` — returns max_similarity, gap, sentinel_weight, is_match
+- `mem.store_negative(fact: str) -> int` — repulsive mode only
+- `mem.diagnose(query: str) -> dict` — convergence speed analysis
+- `mem.save(path: str)` / `HopfieldMemory.load(path: str, encoder=None)`
+
+## Encoders
+
+- `RandomIndexEncoder(dim=512)` — zero dependencies, exact word match
+- `TFIDFEncoder(dim=512)` — requires scikit-learn
+- `SentenceTransformerEncoder(model_name="all-MiniLM-L6-v2")` — high quality semantic
+- `OpenAIEncoder(model="text-embedding-3-small")` — highest quality, requires API key
+
+## Presets
+
+- `small_memory()` — ~100 facts, tools and plugins
+- `medium_memory()` — ~10k facts, conversational agents
+- `large_memory()` — ~100k facts, tiered hot/cold storage
+- `massive_memory()` — millions, FAISS-backed cold store
+
+## Features
+
+- Contradiction detection: `check_and_store(mem, fact, detector)`
+- Multi-hop retrieval: `chain_query(mem, question, max_hops=3)`
+- Tiered storage: `TieredMemory` with hot (exact Hopfield) and cold (FAISS/numpy ANN) tiers
+- Repulsive attention: contrastive energy for faster convergence
+
+## Links
+
+- Source: https://github.com/shahzebqazi/mhn-ai-agent-memory
+- PyPI: https://pypi.org/project/mhn-ai-agent-memory/
+- Paper: https://arxiv.org/abs/2008.02217

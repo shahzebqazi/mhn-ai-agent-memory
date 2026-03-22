@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hopfield-memory-mcp"
+version = "0.1.0"
+description = "MCP server exposing HopfieldMemory tools over stdio"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.2.0",
+    "numpy>=1.24",
+]
+
+[project.scripts]
+hopfield-memory-mcp = "server:main"
+
+[tool.setuptools]
+py-modules = ["server"]

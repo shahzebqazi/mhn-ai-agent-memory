@@ -211,6 +211,26 @@ Under the hood, the network stores a zero-vector sentinel pattern. Three signals
 
 ---
 
+## How It Compares
+
+| | This Library | Honcho | Zep | MemGPT/Letta | Vector DB + LLM |
+|---|---|---|---|---|---|
+| **Architecture** | Hopfield energy landscape | LLM reasoning + DB | Embedding + temporal graph | LLM self-editing context | ANN index + LLM |
+| **Retrieval latency** | ~10 us (numpy matmul) | Seconds (LLM call) | ~ms (vector search) | Seconds (LLM call) | ~ms (ANN) + seconds (LLM) |
+| **Cost per query** | Zero | LLM token cost | Zero (self-hosted) | LLM token cost | LLM token cost |
+| **Deterministic** | Yes | No | Partially | No | No |
+| **"No match" detection** | Built-in (sentinel) | Via LLM judgment | No | Via LLM judgment | No |
+| **Capacity theory** | Exponential in dim (proven) | Unbounded (DB) | Unbounded (DB) | Context window | Unbounded (DB) |
+| **Dependencies** | numpy | Python + LLM API + DB | Python + DB | Python + LLM API | Python + vector DB + LLM API |
+| **MCP server** | Included | Cursor/Claude plugins | No | No | Custom |
+| **Best for** | Fast, deterministic agent memory | Personalized long-term user models | Session history | Autonomous context management | Semantic search over documents |
+
+> This library is not a replacement for Honcho, Zep, or MemGPT -- they solve different problems.
+> Use this when you need fast, deterministic, cost-free associative recall.
+> Use them when you need LLM-powered reasoning about memory, user modeling, or unbounded storage.
+
+---
+
 ## Limitations
 
 This section exists because honest documentation matters more than marketing.
@@ -229,6 +249,8 @@ This section exists because honest documentation matters more than marketing.
 ```
 mhn-ai-agent-memory/
   pyproject.toml              # Package config
+  llms.txt                    # AI agent discoverability
+  CITATION.cff                # Academic citation metadata
   src/hopfield_memory/
     network.py                # ModernHopfieldNetwork (the math)
     memory.py                 # HopfieldMemory (the user API)
@@ -238,9 +260,11 @@ mhn-ai-agent-memory/
     multihop.py               # Chained retrieval
     tiered.py                 # Hot/cold storage for scale
     presets.py                # small/medium/large/massive factories
+  mcp-server/                 # MCP server for Cursor, Claude Code, etc.
   tests/                      # 43 tests
   examples/                   # Runnable demos
   benchmarks/                 # A/B: baseline vs repulsive
+  docs/                       # GitHub Pages blog post
 ```
 
 ---
