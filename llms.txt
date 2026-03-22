@@ -11,6 +11,8 @@ This library replaces the "store text in DB + call LLM" pipeline with the Modern
 - Microsecond retrieval, deterministic, zero cost after storage
 - Exponential capacity in dimension (proven by Ramsauer et al., 2021)
 
+**User-facing applications guide (MHN + LLMs):** `docs/guide-hopfield-memory-with-llms.md`
+
 ## Install
 
 ```
