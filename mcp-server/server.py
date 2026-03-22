@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SRC = _REPO_ROOT / "src"
@@ -88,7 +88,7 @@ def store(fact: str) -> int:
 
 
 @mcp.tool()
-def retrieve(query: str, top_k: int = 3) -> List[List[Any]]:
+def retrieve(query: str, top_k: int = 3) -> list[list[Any]]:
     pairs = _memory.retrieve(query, top_k=top_k)
     return [[fact, weight] for fact, weight in pairs]
 
@@ -129,7 +129,7 @@ def load(path: str) -> dict:
 
 
 @mcp.tool()
-def list_facts() -> List[str]:
+def list_facts() -> list[str]:
     """Return all stored fact strings (empty if none). Same file is shared across agents when using HOPFIELD_STATE_PATH."""
     return _memory.all_facts()
 

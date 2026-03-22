@@ -14,14 +14,14 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-For semantic encoding (recommended for real projects):
+For semantic encoding (recommended when `HOPFIELD_ENCODER` is `sentence_transformer`, as in `.cursor/mcp.json.example`):
 
 ```bash
-cd ..
-pip install -e ".[semantic]"
+# From repo root, install extras into the **mcp-server venv** (not system Python)
+./mcp-server/.venv/bin/pip install -e ".[semantic]"
 ```
 
-(Use the same Python as the venv when installing extras, or install semantic deps into `.venv`.)
+If you have not created the venv yet, run step 1 first, then the command above.
 
 ## 2. Cursor MCP config
 

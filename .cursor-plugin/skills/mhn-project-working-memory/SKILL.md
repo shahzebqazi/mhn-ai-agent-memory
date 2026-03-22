@@ -17,6 +17,8 @@ Associative memory lives in a **JSON file on disk** (not in chat). Any agent wit
 4. Set `HOPFIELD_STATE_PATH` to a path **inside the project** (default example: `.mhn/working-memory.json`). Enable `HOPFIELD_AUTO_SAVE=true` so `store` / `store_negative` persist immediately.
 5. Restart MCP / Cursor so the server picks up env vars.
 
+The bundled `.cursor/mcp.json.example` sets `HOPFIELD_ENCODER` to `sentence_transformer`; install the parent package with semantic extras into the **same venv** as the MCP server (`./mcp-server/.venv/bin/pip install -e ".[semantic]"` from repo root, see `/hopfield-mcp-setup`), **or** change that env var to `random` if you want no extra dependencies (weaker recall).
+
 Use `sentence_transformer` (or better encoders) for semantic recall; `random` is fine only for exact-token overlap demos.
 
 ## Agent workflow

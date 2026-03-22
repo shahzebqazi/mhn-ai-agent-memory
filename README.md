@@ -273,7 +273,7 @@ mhn-ai-agent-memory/
 
 ## Cursor: shared project working memory
 
-Multiple agents (or new chats) can share one **on-disk** Hopfield store: set `HOPFIELD_STATE_PATH` and `HOPFIELD_AUTO_SAVE` on the MCP server (see `mcp-server/README.md`). Copy `.cursor/mcp.json.example` → `.cursor/mcp.json`, fix paths if `${workspaceFolder}` is not expanded, then use MCP tools `list_facts`, `retrieve`, and `query_or_none` as a project-local knowledge base. The **mhn-project-working-memory** skill under `.cursor/skills/` teaches the agent that workflow. For marketplace packaging, see `.cursor-plugin/plugin.json` and run **`/hopfield-mcp-setup`**.
+Multiple agents (or new chats) can share one **on-disk** Hopfield store: set `HOPFIELD_STATE_PATH` and `HOPFIELD_AUTO_SAVE` on the MCP server (see `mcp-server/README.md`). Copy `.cursor/mcp.json.example` → `.cursor/mcp.json`, fix paths if `${workspaceFolder}` is not expanded, install `mhn-ai-agent-memory[semantic]` into the MCP venv if you keep `HOPFIELD_ENCODER=sentence_transformer`, **or** switch that env var to `random` when you want zero extra deps—then use MCP tools `list_facts`, `retrieve`, and `query_or_none` as a project-local knowledge base. The **mhn-project-working-memory** skill under `.cursor/skills/` teaches the agent that workflow. For marketplace packaging, see `.cursor-plugin/plugin.json` and run **`/hopfield-mcp-setup`**.
 
 ---
 
