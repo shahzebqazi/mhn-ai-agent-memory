@@ -180,7 +180,11 @@ class HopfieldMemory:
 
         sentinel_w = float(weights[self._sentinel_idx]) if self._sentinel_idx >= 0 else 0.0
 
-        is_match = max_sim > 0.25
+        is_match = (
+            max_sim >= 0.25
+            and gap > 0.01
+            and (self._sentinel_idx < 0 or sentinel_w < 0.5)
+        )
 
         return {
             "max_similarity": max_sim,
@@ -195,21 +199,26 @@ class HopfieldMemory:
         """Return True if the query meaningfully matches a stored fact.
 
         Uses the maximum raw dot product between the query vector and
-        stored patterns as the primary signal. This is computed before
-        the softmax, so it reflects actual content overlap rather than
-        relative ranking.
+        stored patterns as the primary signal (equals cosine similarity
+        when patterns and query are unit-norm, as with RandomIndexEncoder).
+
+        Also checks that the attention gap is above a floor and that the
+        sentinel pattern does not dominate the softmax.
 
         Parameters
         ----------
         query : str
             The query text.
         min_similarity : float
-            Minimum raw cosine similarity to any stored pattern to
-            consider a match genuine. Default 0.25 works well with
-            the RandomIndexEncoder for 5+ stored facts.
+            Minimum dot product to any stored pattern. Default 0.25 works
+            well with the RandomIndexEncoder for 5+ stored facts.
         """
         mq = self.match_quality(query)
-        return mq["is_match"] and mq["max_similarity"] >= min_similarity
+        return (
+            mq["max_similarity"] >= min_similarity
+            and mq["gap"] > 0.01
+            and (self._sentinel_idx < 0 or mq["sentinel_weight"] < 0.5)
+        )
 
     def query_or_none(self, question: str, min_similarity: float = 0.25) -> Optional[str]:
         """Return the best matching fact, or None if nothing matches.
@@ -286,6 +295,8 @@ class HopfieldMemory:
             "beta": self.network.base_beta,
             "adaptive_beta": self.network.adaptive_beta,
             "repulsive": self.repulsive,
+            "sentinel": self._sentinel,
+            "sentinel_idx": self._sentinel_idx,
             "facts": self.facts,
             "patterns": [p.tolist() for p in self.network.patterns],
             "encoder_type": type(self.encoder).__name__,
@@ -320,11 +331,24 @@ class HopfieldMemory:
             repulsive=is_repulsive,
             beta_neg=data.get("beta_neg", 6.0),
             clamp_radius=data.get("clamp_radius", 1.5),
+            sentinel=False,
         )
         for fact, pattern in zip(data["facts"], data["patterns"]):
             vec = np.array(pattern)
             mem.network.store(vec)
             mem.facts.append(fact)
+
+        def _infer_legacy_sentinel(d):
+            if not d.get("facts") or d["facts"][0] != "":
+                return False
+            if not d.get("patterns") or any(v != 0.0 for v in d["patterns"][0]):
+                return False
+            return True
+
+        has_sentinel = data.get("sentinel", _infer_legacy_sentinel(data))
+        mem._sentinel = has_sentinel
+        mem._sentinel_idx = int(data.get("sentinel_idx",
+                                         0 if has_sentinel else -1))
 
         if is_repulsive and "negative_patterns" in data:
             for fact, pattern in zip(data.get("negative_facts", []), data["negative_patterns"]):

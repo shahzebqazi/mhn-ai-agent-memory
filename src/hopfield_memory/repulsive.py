@@ -130,12 +130,18 @@ class RepulsiveMHN(ModernHopfieldNetwork):
         return self.energy_components(state).total
 
     def energy_components(self, state: np.ndarray) -> EnergyComponents:
-        """Return individual energy terms for logging."""
+        """Return individual energy terms for logging.
+
+        Uses the state-dependent beta for the positive term when
+        adaptive_beta is enabled, consistent with retrieve().
+        """
         X = self._pattern_matrix()
-        pos_logits = self.base_beta * (X.T @ state)
+        raw_pos = X.T @ state
+        beta_pos = self._compute_beta(raw_pos)
+        pos_logits = beta_pos * raw_pos
         pos_shift = np.max(pos_logits)
         pos_lse = np.log(np.sum(np.exp(pos_logits - pos_shift))) + pos_shift
-        e_pos = -(1.0 / self.base_beta) * pos_lse
+        e_pos = -(1.0 / beta_pos) * pos_lse
 
         e_neg = 0.0
         Y = self._negative_matrix()

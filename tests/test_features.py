@@ -49,11 +49,7 @@ def test_adaptive_beta_improvement():
 
 
 def test_contradiction_actually_detected():
-    """Contradiction detector must flag facts that share subject but differ on predicate.
-
-    Uses a low similarity threshold + manually constructed high-overlap vectors
-    to guarantee the structural check triggers.
-    """
+    """Contradiction detector must flag facts that share subject but differ on predicate."""
     enc = RandomIndexEncoder(dim=512)
     mem = HopfieldMemory(encoder=enc, beta=10.0)
     detector = ContradictionDetector(similarity_threshold=0.40, top_k=5)
@@ -73,14 +69,15 @@ def test_contradiction_actually_detected():
     original_vec = enc.encode("The capital of France is Paris")
     sim = float(np.dot(vec, original_vec))
 
-    if sim >= 0.40:
-        assert result.has_conflict, (
-            f"Similarity {sim:.3f} >= threshold 0.40 but conflict not detected"
-        )
-        assert len(result.conflicting_facts) > 0
-        assert "Paris" in result.conflicting_facts[0][0]
-    else:
-        pass
+    assert sim >= 0.40, (
+        f"Similarity {sim:.3f} too low for this encoder/dim -- "
+        f"increase dim or lower threshold to make this test meaningful"
+    )
+    assert result.has_conflict, (
+        f"Similarity {sim:.3f} >= threshold 0.40 but conflict not detected"
+    )
+    assert len(result.conflicting_facts) > 0
+    assert "Paris" in result.conflicting_facts[0][0]
 
 
 def test_contradiction_auto_resolve_replaces_fact():
@@ -312,3 +309,187 @@ def test_num_facts_excludes_sentinel():
     assert mem.num_facts == 1
     mem.store("Second fact")
     assert mem.num_facts == 2
+
+
+# ─── Save/load roundtrip tests ──────────────────────────────────────
+
+
+def test_save_load_roundtrip():
+    """Save and load must preserve pattern count, facts, and retrieval."""
+    enc = RandomIndexEncoder(dim=256)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("hello world")
+    mem.store("foo bar")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_roundtrip_test.json")
+    mem.save(path)
+    loaded = HopfieldMemory.load(path, encoder=enc)
+
+    assert len(loaded.network.patterns) == len(mem.network.patterns), (
+        f"Pattern count mismatch: original={len(mem.network.patterns)}, "
+        f"loaded={len(loaded.network.patterns)}"
+    )
+    assert loaded.facts == mem.facts, (
+        f"Facts mismatch: original={mem.facts}, loaded={loaded.facts}"
+    )
+    assert loaded._sentinel == mem._sentinel
+    assert loaded._sentinel_idx == mem._sentinel_idx
+    assert loaded.num_facts == mem.num_facts
+    assert "hello" in loaded.query("hello world").lower()
+
+
+def test_save_load_roundtrip_no_sentinel():
+    """Save/load roundtrip with sentinel=False must not create spurious sentinels."""
+    enc = RandomIndexEncoder(dim=128)
+    mem = HopfieldMemory(encoder=enc, beta=10.0, sentinel=False)
+    mem.store("alpha beta gamma")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_no_sentinel_test.json")
+    mem.save(path)
+    loaded = HopfieldMemory.load(path, encoder=enc)
+
+    assert loaded._sentinel is False
+    assert loaded._sentinel_idx == -1
+    assert loaded.facts == mem.facts
+    assert len(loaded.network.patterns) == len(mem.network.patterns)
+
+
+def test_save_load_backward_compat():
+    """Files saved without sentinel metadata should be loaded correctly."""
+    import json as _json
+
+    enc = RandomIndexEncoder(dim=128)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("test fact")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_compat_test.json")
+    mem.save(path)
+
+    with open(path, "r") as f:
+        data = _json.load(f)
+    del data["sentinel"]
+    del data["sentinel_idx"]
+    with open(path, "w") as f:
+        _json.dump(data, f)
+
+    loaded = HopfieldMemory.load(path, encoder=enc)
+    assert loaded._sentinel is True
+    assert loaded._sentinel_idx == 0
+    assert loaded.facts == mem.facts
+    assert len(loaded.network.patterns) == len(mem.network.patterns)
+
+
+def test_save_load_legacy_rejects_fake_sentinel():
+    """A legacy file with facts[0]=="" but non-zero pattern[0] must not infer a sentinel."""
+    import json as _json
+
+    enc = RandomIndexEncoder(dim=128)
+    mem = HopfieldMemory(encoder=enc, beta=10.0, sentinel=False)
+    mem.store("real fact")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_fake_sentinel_test.json")
+    mem.save(path)
+
+    with open(path, "r") as f:
+        data = _json.load(f)
+    del data["sentinel"]
+    del data["sentinel_idx"]
+    data["facts"].insert(0, "")
+    data["patterns"].insert(0, data["patterns"][0])
+    with open(path, "w") as f:
+        _json.dump(data, f)
+
+    loaded = HopfieldMemory.load(path, encoder=enc)
+    assert loaded._sentinel is False
+
+
+def test_save_load_repulsive_roundtrip():
+    """Repulsive MHN save/load must preserve positive and negative patterns."""
+    enc = RandomIndexEncoder(dim=128)
+    mem = HopfieldMemory(encoder=enc, beta=10.0, repulsive=True, beta_neg=6.0)
+    mem.store("positive fact one")
+    mem.store("positive fact two")
+    mem.store_negative("negative fact")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_repulsive_test.json")
+    mem.save(path)
+    loaded = HopfieldMemory.load(path, encoder=enc)
+
+    assert loaded.repulsive is True
+    assert len(loaded.network.patterns) == len(mem.network.patterns)
+    assert len(loaded.network.negative_patterns) == len(mem.network.negative_patterns)
+    assert loaded.negative_facts == mem.negative_facts
+
+
+# ─── Encoder determinism tests ───────────────────────────────────────
+
+
+def test_encoder_determinism_stable_seed():
+    """RandomIndexEncoder must produce identical vectors across fresh instances."""
+    enc1 = RandomIndexEncoder(dim=256)
+    enc2 = RandomIndexEncoder(dim=256)
+
+    for word in ["hello", "world", "quantum", "Hopfield", ""]:
+        v1 = enc1.encode(word)
+        v2 = enc2.encode(word)
+        np.testing.assert_array_equal(v1, v2, err_msg=f"Mismatch for {word!r}")
+
+
+# ─── Property-based tests ────────────────────────────────────────────
+
+
+def test_softmax_weights_sum_to_one():
+    """Attention weights from retrieve() must sum to 1 and be non-negative."""
+    rng = np.random.default_rng(77)
+    dim = 128
+    net = ModernHopfieldNetwork(dim=dim, beta=8.0, adaptive_beta=True)
+
+    for _ in range(8):
+        p = rng.standard_normal(dim)
+        p /= np.linalg.norm(p)
+        net.store(p)
+
+    for _ in range(20):
+        q = rng.standard_normal(dim)
+        q /= np.linalg.norm(q)
+        _, weights = net.retrieve(q)
+        assert np.all(weights >= 0), "Negative attention weight"
+        np.testing.assert_allclose(np.sum(weights), 1.0, atol=1e-12)
+
+
+def test_retrieved_state_is_convex_combination():
+    """For unit-norm patterns, retrieved state norm must be <= 1."""
+    rng = np.random.default_rng(88)
+    dim = 128
+    net = ModernHopfieldNetwork(dim=dim, beta=8.0, adaptive_beta=False)
+
+    for _ in range(6):
+        p = rng.standard_normal(dim)
+        p /= np.linalg.norm(p)
+        net.store(p)
+
+    for _ in range(20):
+        q = rng.standard_normal(dim)
+        q /= np.linalg.norm(q)
+        retrieved, _ = net.retrieve(q)
+        assert np.linalg.norm(retrieved) <= 1.0 + 1e-10
+
+
+def test_save_load_preserves_pattern_and_fact_count():
+    """After load, len(patterns) must equal len(facts) and sentinel count must be correct."""
+    enc = RandomIndexEncoder(dim=128)
+    mem = HopfieldMemory(encoder=enc, beta=10.0)
+    mem.store("fact one")
+    mem.store("fact two")
+    mem.store("fact three")
+
+    path = os.path.join(tempfile.gettempdir(), "hopfield_count_test.json")
+    mem.save(path)
+    loaded = HopfieldMemory.load(path, encoder=enc)
+
+    assert len(loaded.network.patterns) == len(loaded.facts)
+    sentinel_count = sum(1 for f in loaded.facts if f == "")
+    if loaded._sentinel:
+        assert sentinel_count == 1
+    else:
+        assert sentinel_count == 0

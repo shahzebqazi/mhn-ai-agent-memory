@@ -90,14 +90,21 @@ class ModernHopfieldNetwork:
 
         return xi, weights
 
-    def energy(self, state: np.ndarray) -> float:
+    def energy(self, state: np.ndarray, beta: Optional[float] = None) -> float:
         """Compute the Hopfield energy at a given state.
 
-        Uses the beta-scaled form: E = -(1/beta) * lse(beta * X^T @ xi) + 0.5 * ||xi||^2
-        which matches Ramsauer et al. (2021) Equation 3 up to an additive constant.
+        When adaptive_beta is enabled and *beta* is not provided, uses the
+        state-dependent beta that retrieve() would compute for this state.
+        Pass an explicit *beta* to evaluate the energy at a fixed temperature.
+
+        Note: with adaptive_beta, the effective beta varies with state, so
+        the energy landscape is not a single global Lyapunov function.
+        Energy decrease is empirical, not guaranteed.
         """
         X = self._pattern_matrix()
-        logits = self.base_beta * (X.T @ state)
+        raw_logits = X.T @ state
+        b = beta if beta is not None else self._compute_beta(raw_logits)
+        logits = b * raw_logits
         shift = np.max(logits)
         lse = np.log(np.sum(np.exp(logits - shift))) + shift
-        return -(1.0 / self.base_beta) * lse + 0.5 * np.dot(state, state)
+        return -(1.0 / b) * lse + 0.5 * np.dot(state, state)

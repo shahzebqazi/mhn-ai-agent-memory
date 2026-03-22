@@ -11,8 +11,15 @@ environment without manual dependency checking.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
+import hashlib
 import numpy as np
 import warnings
+
+
+def _stable_seed(text: str) -> int:
+    """Derive a deterministic 64-bit seed from a string, independent of PYTHONHASHSEED."""
+    digest = hashlib.sha256(text.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "little")
 
 
 class Encoder(ABC):
@@ -26,7 +33,11 @@ class Encoder(ABC):
 
     @abstractmethod
     def encode(self, text: str) -> np.ndarray:
-        """Encode a single text string into a unit-norm vector."""
+        """Encode a single text string into a vector.
+
+        Returns a unit-norm vector for non-empty text. Empty text returns
+        the zero vector (used by the sentinel pattern).
+        """
         ...
 
     def encode_batch(self, texts: List[str]) -> np.ndarray:
@@ -54,7 +65,7 @@ class RandomIndexEncoder(Encoder):
 
     def _word_vector(self, word: str) -> np.ndarray:
         if word not in self._cache:
-            rng = np.random.default_rng(hash(word) % (2**32))
+            rng = np.random.default_rng(_stable_seed(word))
             self._cache[word] = rng.standard_normal(self._dim)
         return self._cache[word]
 
@@ -120,7 +131,7 @@ class TFIDFEncoder(Encoder):
     def encode(self, text: str) -> np.ndarray:
         self._ensure_fitted(text)
         if not self._fitted:
-            rng = np.random.default_rng(hash(text) % (2**32))
+            rng = np.random.default_rng(_stable_seed(text))
             vec = rng.standard_normal(self._dim)
             vec /= np.linalg.norm(vec)
             return vec
@@ -172,7 +183,7 @@ class OpenAIEncoder(Encoder):
     Costs money per call.
     """
 
-    def __init__(self, model: str = "text-embedding-3-small", api_key: Optional[str] = None):
+    def __init__(self, model: str = "text-embedding-3-small", api_key: Optional[str] = None, dim: Optional[int] = None):
         try:
             import openai
         except ImportError:
@@ -185,7 +196,15 @@ class OpenAIEncoder(Encoder):
 
         self._client = openai.OpenAI(api_key=key)
         self._model = model
-        self._dim = 1536 if "small" in model else 3072
+        if dim is not None:
+            self._dim = dim
+        else:
+            _known = {
+                "text-embedding-3-small": 1536,
+                "text-embedding-3-large": 3072,
+                "text-embedding-ada-002": 1536,
+            }
+            self._dim = _known.get(model, 1536 if "small" in model else 3072)
 
     @property
     def dim(self) -> int:
