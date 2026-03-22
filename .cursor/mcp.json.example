@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "hopfield-memory": {
+      "command": "${workspaceFolder}/mcp-server/.venv/bin/python",
+      "args": ["${workspaceFolder}/mcp-server/server.py"],
+      "env": {
+        "HOPFIELD_ENCODER": "sentence_transformer",
+        "HOPFIELD_ST_MODEL": "all-MiniLM-L6-v2",
+        "HOPFIELD_BETA": "10.0",
+        "HOPFIELD_REPULSIVE": "false",
+        "HOPFIELD_STATE_PATH": "${workspaceFolder}/.mhn/working-memory.json",
+        "HOPFIELD_AUTO_SAVE": "true"
+      }
+    }
+  }
+}
