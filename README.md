@@ -9,8 +9,7 @@
 [![Tests](https://img.shields.io/badge/tests-43%20passing-brightgreen.svg)](#development)
 [![arXiv](https://img.shields.io/badge/arXiv-2008.02217-b31b1b.svg)](https://arxiv.org/abs/2008.02217)
 
-**Give your AI agents real memory.**
-**Not a database with an LLM wrapper. Actual associative memory backed by mathematics.**
+**A Python library for deterministic associative memory in AI agents.**
 
 [Install](#install) &#8226; [Quick Start](#30-second-example) &#8226; [Features](#features-at-a-glance) &#8226; [How It Works](#how-it-works-plain-english) &#8226; [API Reference](#project-structure)
 
@@ -37,13 +36,11 @@
 
 ## What is this?
 
-When an AI agent needs to "remember" something today, the standard approach is:
+Many agent memory systems store text in a database, then ask an LLM to interpret it at query time. This library does something else: it applies the [Modern Hopfield Network](https://arxiv.org/abs/2008.02217) update rule directly, exposing transformer-style attention as an explicit, controllable memory.
 
 1. Store text in a database
 2. Call an LLM to reason about it (costs money, takes seconds, non-deterministic)
 3. Hope the LLM doesn't hallucinate about what it stored
-
-This library replaces that pipeline with the [Modern Hopfield Network](https://arxiv.org/abs/2008.02217) update rule -- the same mathematical structure as transformer attention, but exposed as an explicit, controllable memory.
 
 | | Traditional (LLM + DB) | This Library |
 |---|---|---|
@@ -53,9 +50,7 @@ This library replaces that pipeline with the [Modern Hopfield Network](https://a
 | **Determinism** | Non-deterministic | Deterministic |
 | **Capacity** | Depends on embedding quality | Exponential in dimension (proven) |
 
-**Store a fact.** It becomes a pattern in an energy landscape.
-**Query with a partial cue.** The network relaxes to the nearest stored pattern.
-**Get the answer.** Confidence score included.
+Store a fact as a pattern in the energy landscape. Query with a partial cue, and the network relaxes toward the nearest stored pattern. The retrieval weight gives you a confidence signal.
 
 ---
 
@@ -65,7 +60,7 @@ This library replaces that pipeline with the [Modern Hopfield Network](https://a
 pip install mhn-ai-agent-memory
 ```
 
-Optional extras for better quality and scale:
+Optional extras:
 
 ```bash
 pip install mhn-ai-agent-memory[semantic]   # sentence-transformers (~80MB model)
@@ -92,7 +87,7 @@ print(fact)        # "Alice is a mathematician who studies topology"
 print(confidence)  # 0.9999
 ```
 
-No API keys. No database. No config files. The memory is a numpy array.
+No API keys, database, or config files. The memory is a NumPy array.
 
 ---
 
@@ -100,7 +95,7 @@ No API keys. No database. No config files. The memory is a numpy array.
 
 ### Pluggable Encoders
 
-Swap how text becomes vectors. Start simple, upgrade when you need to.
+Choose an encoder based on quality, cost, and dependencies.
 
 ```python
 from hopfield_memory import HopfieldMemory, SentenceTransformerEncoder
@@ -117,7 +112,7 @@ mem = HopfieldMemory(encoder=SentenceTransformerEncoder())
 
 ### Contradiction Detection
 
-Catch conflicting facts before they corrupt your memory.
+Flag likely conflicts before storing new facts.
 
 ```python
 from hopfield_memory import check_and_store, ContradictionDetector
@@ -130,7 +125,7 @@ if conflict.has_conflict:
 
 ### Multi-Hop Retrieval
 
-Chain queries to follow reasoning across related facts.
+Follow related facts across multiple retrieval steps.
 
 ```python
 from hopfield_memory import chain_query
@@ -144,6 +139,8 @@ chain_query(mem, "capital of Alice's country", max_hops=3)
 
 ### Scale from 10 to 10 Million Facts
 
+Use a small in-memory setup for local tools, or add tiered storage when the fact set grows.
+
 ```python
 from hopfield_memory import small_memory, large_memory, massive_memory
 
@@ -152,11 +149,11 @@ mem = large_memory()    # ~100k facts, tiered hot/cold storage
 mem = massive_memory()  # millions, FAISS-backed cold store
 ```
 
-The tiered system keeps your most-accessed memories in an exact Hopfield network (microsecond retrieval) and archives the rest to an approximate nearest-neighbor index on disk.
+Hot memories stay in the exact Hopfield network. Colder memories can move to an approximate nearest-neighbor index on disk.
 
 ### Repulsive Attention (Opt-In)
 
-Up to 17x faster convergence for multi-step retrieval by adding contrastive "hills" to the energy landscape.
+In the included benchmark, repulsive attention improved convergence by up to 17x for multi-step retrieval by adding contrastive "hills" to the energy landscape.
 
 ```python
 mem = HopfieldMemory(repulsive=True)
@@ -169,7 +166,7 @@ print(diag["recommendation"])  # agents decide at runtime
 
 ### "Nothing Matches" Detection
 
-AI agents need to know when a query has no relevant memory -- not just pick the least-bad option. This library solves it with three independent signals combined via a sentinel pattern.
+Sometimes the right answer is "nothing relevant is stored." This library exposes that case instead of forcing the closest pattern.
 
 ```python
 from hopfield_memory import HopfieldMemory
@@ -192,7 +189,8 @@ print(mq["max_similarity"])   # ~0.14 (low -- no real word overlap)
 print(mq["is_match"])         # False
 ```
 
-Under the hood, the network stores a zero-vector sentinel pattern. Three signals are combined:
+Under the hood, the network stores a zero-vector sentinel pattern and combines three signals:
+
 - **max_similarity** -- raw dot product before softmax (the primary signal)
 - **gap** -- attention weight separation between top patterns
 - **sentinel_weight** -- how much attention goes to the "nothing" anchor
@@ -201,13 +199,13 @@ Under the hood, the network stores a zero-vector sentinel pattern. Three signals
 
 ## How It Works (Plain English)
 
-1. **You store a fact.** The text is encoded into a vector and added to a matrix of stored patterns. This matrix IS the memory.
+1. **You store a fact.** The text is encoded into a vector and added to a matrix of stored patterns. This matrix is the memory.
 
-2. **You query with a cue.** The network computes similarity between the cue and every stored pattern, then uses a softmax to sharply concentrate attention on the best match.
+2. **You query with a cue.** The network scores the cue against every stored pattern, then uses a softmax to concentrate attention on the strongest matches.
 
-3. **You get a result.** The output is the stored pattern the network "attracted" to -- the nearest memory. The softmax weight is your confidence score.
+3. **You get a result.** The output is the stored pattern the network is attracted to. The top softmax weight is your confidence score.
 
-> **Key insight:** This has the same mathematical structure as a single step of transformer attention (with tied keys and values). This library exposes that operation directly as a memory system, without wrapping it in an LLM.
+> **Key insight:** This has the same mathematical structure as a single step of transformer attention (with tied keys and values). The library exposes that operation directly as a memory system, without wrapping it in an LLM.
 
 ---
 
@@ -225,15 +223,11 @@ Under the hood, the network stores a zero-vector sentinel pattern. Three signals
 | **MCP server** | Included | Cursor/Claude plugins | No | No | Custom |
 | **Best for** | Fast, deterministic agent memory | Personalized long-term user models | Session history | Autonomous context management | Semantic search over documents |
 
-> This library is not a replacement for Honcho, Zep, or MemGPT -- they solve different problems.
-> Use this when you need fast, deterministic, cost-free associative recall.
-> Use them when you need LLM-powered reasoning about memory, user modeling, or unbounded storage.
+These tools solve different problems. Use this library when you need fast, deterministic, cost-free associative recall. Use the others when you need LLM-mediated reasoning about memory, user modeling, or effectively unbounded storage.
 
 ---
 
 ## Limitations
-
-This section exists because honest documentation matters more than marketing.
 
 - **Default encoder is bag-of-words.** "dog" and "canine" get zero similarity without `[semantic]` extra.
 - **Contradiction detection is heuristic.** Works best with simple factual statements.
@@ -262,7 +256,6 @@ mhn-ai-agent-memory/
     presets.py                # small/medium/large/massive factories
   mcp-server/                 # MCP server for Cursor, Claude Code, etc.
   .cursor/                    # Cursor MCP example + project skill
-  .cursor-plugin/             # Cursor marketplace plugin manifest (local install)
   tests/                      # 43 tests
   examples/                   # Runnable demos
   benchmarks/                 # A/B: baseline vs repulsive
@@ -273,7 +266,15 @@ mhn-ai-agent-memory/
 
 ## Cursor: shared project working memory
 
-Multiple agents (or new chats) can share one **on-disk** Hopfield store: set `HOPFIELD_STATE_PATH` and `HOPFIELD_AUTO_SAVE` on the MCP server (see `mcp-server/README.md`). Copy `.cursor/mcp.json.example` → `.cursor/mcp.json`, fix paths if `${workspaceFolder}` is not expanded, install `mhn-ai-agent-memory[semantic]` into the MCP venv if you keep `HOPFIELD_ENCODER=sentence_transformer`, **or** switch that env var to `random` when you want zero extra deps—then use MCP tools `list_facts`, `retrieve`, and `query_or_none` as a project-local knowledge base. The **mhn-project-working-memory** skill under `.cursor/skills/` teaches the agent that workflow. For marketplace packaging, see `.cursor-plugin/plugin.json` and run **`/hopfield-mcp-setup`**.
+Multiple agents, or multiple chats, can share one **on-disk** Hopfield store.
+
+To set that up:
+
+1. Set `HOPFIELD_STATE_PATH` and `HOPFIELD_AUTO_SAVE` in the MCP server config.
+2. Copy `.cursor/mcp.json.example` to `.cursor/mcp.json`. If `${workspaceFolder}` is not expanded in your Cursor build, replace it with absolute paths.
+3. If you keep `HOPFIELD_ENCODER=sentence_transformer`, install `mhn-ai-agent-memory[semantic]` into the MCP venv. If you want zero extra dependencies, set `HOPFIELD_ENCODER=random` instead.
+
+Then use MCP tools such as `list_facts`, `retrieve`, and `query_or_none` as a project-local knowledge base. See `mcp-server/README.md` for the full setup. The **mhn-project-working-memory** skill under `.cursor/skills/` teaches that workflow.
 
 ---
 

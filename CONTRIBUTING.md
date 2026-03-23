@@ -23,9 +23,9 @@ pytest
 
 ## Commit Messages
 
-Follow conventional commits:
+Use conventional commits:
 
-```
+```text
 feat(encoders): add nomic-embed-text encoder
 fix(tiered): correct eviction order in hot store
 docs(readme): update installation instructions
@@ -37,7 +37,7 @@ test(network): add capacity scaling benchmarks
 1. Fork and create a branch
 2. Write tests for new functionality
 3. Ensure `pytest` passes
-4. Submit a PR with a clear description
+4. Open a PR with a clear description
 
 ## Code Style
 

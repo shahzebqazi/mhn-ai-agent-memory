@@ -17,7 +17,7 @@ Associative memory lives in a **JSON file on disk** (not in chat). Any agent wit
 4. Set `HOPFIELD_STATE_PATH` to a path **inside the project** (default example: `.mhn/working-memory.json`). Enable `HOPFIELD_AUTO_SAVE=true` so `store` / `store_negative` persist immediately.
 5. Restart MCP / Cursor so the server picks up env vars.
 
-The bundled `.cursor/mcp.json.example` sets `HOPFIELD_ENCODER` to `sentence_transformer`; install the parent package with semantic extras into the **same venv** as the MCP server (`./mcp-server/.venv/bin/pip install -e ".[semantic]"` from repo root, see `/hopfield-mcp-setup`), **or** change that env var to `random` if you want no extra dependencies (weaker recall).
+The bundled `.cursor/mcp.json.example` sets `HOPFIELD_ENCODER` to `sentence_transformer`; install the parent package with semantic extras into the **same venv** as the MCP server (`./mcp-server/.venv/bin/pip install -e ".[semantic]"` from repo root), **or** change that env var to `random` if you want no extra dependencies (weaker recall).
 
 Use `sentence_transformer` (or better encoders) for semantic recall; `random` is fine only for exact-token overlap demos.
 
@@ -35,7 +35,3 @@ Use `sentence_transformer` (or better encoders) for semantic recall; `random` is
 - Do **not** store secrets (tokens, keys); memory files may be copied or logged.
 - After changing `HOPFIELD_ENCODER`, treat old state files as incompatible unless you know encoders match.
 - Prefer **`query_or_none`** over **`query`** when hallucinating a wrong “best fact” is worse than admitting no match.
-
-## Marketplace plugin
-
-Install the local Cursor plugin from `.cursor-plugin/` (see that folder’s `plugin.json`) to ship this skill with the repo; submit the same tree to the Cursor plugin marketplace when ready. The same skill text is kept under `.cursor-plugin/skills/` for packaging (keep both copies aligned if you edit one).

@@ -1,13 +1,13 @@
 # Hopfield Memory MCP server
 
-Python [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes [HopfieldMemory](../src/hopfield_memory/memory.py) to agents (store, retrieve, query, repulsive patterns, persistence).
+This Python [Model Context Protocol](https://modelcontextprotocol.io/) server exposes [HopfieldMemory](../src/hopfield_memory/memory.py) to agents. It supports storage, retrieval, repulsive patterns, and persistence.
 
 ## Requirements
 
 - Python 3.10+ (required by the `mcp` package)
-- The parent package `mhn-ai-agent-memory` checked out beside this folder (this server adds `../src` to `sys.path` at startup)
+- The parent package `mhn-ai-agent-memory` checked out beside this folder (the server adds `../src` to `sys.path` at startup)
 
-Optional encoders (set `HOPFIELD_ENCODER`):
+Optional encoders, selected with `HOPFIELD_ENCODER`:
 
 - `sentence_transformer` — `pip install -e ..[semantic]` from the repo root
 - `tfidf` — `pip install -e ..[tfidf]`
@@ -15,7 +15,7 @@ Optional encoders (set `HOPFIELD_ENCODER`):
 
 ## Installation
 
-From this directory:
+From `mcp-server/`:
 
 ```bash
 cd mcp-server
@@ -24,7 +24,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-`numpy` is pulled in as a dependency; HopfieldMemory itself only needs the parent repo on `sys.path` (handled by `server.py`).
+`numpy` is installed as a dependency. `server.py` handles the parent repo import path automatically.
 
 ## Environment variables
 
@@ -40,7 +40,7 @@ pip install -e .
 
 ## Cursor
 
-Add a server entry to your MCP config (user-level `~/.cursor/mcp.json` or project `.cursor/mcp.json`):
+Add a server entry to your MCP config, either in `~/.cursor/mcp.json` or the project-level `.cursor/mcp.json`:
 
 ```json
 {
@@ -60,11 +60,11 @@ Add a server entry to your MCP config (user-level `~/.cursor/mcp.json` or projec
 }
 ```
 
-Use the same Python interpreter that has `mcp` installed (the venv shown above, or another environment where you ran `pip install -e .` in `mcp-server`).
+Use the same Python interpreter where you installed `mcp`, whether that is the venv above or another environment where you ran `pip install -e .` inside `mcp-server`.
 
 ## Claude Code
 
-In Claude Code, register an MCP server with the same **command**, **args**, and **env** as in the Cursor example (Claude Desktop / Claude Code MCP UI: “stdio” server with `python` and path to `server.py`). Paths must be absolute on your machine.
+In Claude Code, register an MCP server with the same **command**, **args**, and **env** as in the Cursor example. In the Claude Desktop or Claude Code MCP UI, that means a `stdio` server using `python` and the path to `server.py`. Paths must be absolute on your machine.
 
 Example `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
 
@@ -96,12 +96,12 @@ Example `claude_desktop_config.json` (macOS: `~/Library/Application Support/Clau
 
 ## Example agent flow
 
-1. **`store`** — “User’s favorite color is teal.”
-2. **`retrieve`** with `query`: “what color do they like?” and `top_k`: `3` — ranked facts with attention weights.
-3. **`query_or_none`** with the same question — returns the fact or `null` if similarity is below `min_similarity`.
-4. **`save`** to `/tmp/agent_memory.json` before shutdown; on next session **`load`** that path to restore.
+1. **`store`** — store "User’s favorite color is teal."
+2. **`retrieve`** — query "what color do they like?" with `top_k=3` to inspect ranked matches and attention weights.
+3. **`query_or_none`** — ask the same question when you want either one fact or `null`.
+4. **`save`** — write to `/tmp/agent_memory.json` before shutdown, then **`load`** that path in the next session.
 
-**Shared project working memory:** set `HOPFIELD_STATE_PATH` to a JSON file inside the repo (for example `.mhn/working-memory.json`), and `HOPFIELD_AUTO_SAVE=true`. Every Cursor agent using the same MCP config reads/writes the same file, so memory swaps with the project, not with a single chat. Use **`list_facts`** to list everything on disk; **`working_memory_status`** to confirm the path and encoder.
+**Shared project working memory:** set `HOPFIELD_STATE_PATH` to a JSON file inside the repo, for example `.mhn/working-memory.json`, and set `HOPFIELD_AUTO_SAVE=true`. Any Cursor agent using the same MCP config will read and write the same file, so the memory stays with the project instead of one chat. Use **`list_facts`** to inspect stored facts and **`working_memory_status`** to confirm the active path and encoder.
 
 Run manually (stdio MCP transport):
 
