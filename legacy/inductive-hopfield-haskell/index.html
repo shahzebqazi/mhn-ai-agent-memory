@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modern Hopfield Network: Cortex Sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #030308; color: white; font-family: 'Inter', sans-serif; touch-action: none; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; }
+        .glass-panel { background: rgba(10, 10, 20, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; pointer-events: auto; }
+        
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00f0ff; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px #00f0ff; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 2px; }
+        
+        button { touch-action: manipulation; transition: all 0.2s; }
+        button:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        
+        <!-- Header -->
+        <div class="glass-panel p-4 md:p-6 max-w-md w-full mx-auto mt-2 md:mt-4 shadow-2xl">
+            <h1 class="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500 mb-2">
+                Modern Hopfield Network
+            </h1>
+            <p class="text-[11px] md:text-xs text-gray-400 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span class="text-white/90 font-medium">willy boi</span>
+                <a href="https://github.com/shahzebqazi" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline pointer-events-auto">GitHub</a>
+                <a href="mailto:dev@shahzeb.me" class="text-purple-400 hover:text-purple-300 underline-offset-2 hover:underline pointer-events-auto">dev@shahzeb.me</a>
+            </p>
+            <p class="text-xs md:text-sm text-gray-300 leading-relaxed">
+                Visualizing an <span class="text-cyan-400 font-mono">N=3</span> state space. The flat "cortex sheet" represents 2 dimensions, while depth represents network <strong>Energy</strong>. 
+                <br><br>
+                Injecting memories creates <span class="text-purple-400">basins of attraction</span> (gravity wells). The network retrieves a memory by rolling down into the nearest well.
+            </p>
+        </div>
+
+        <!-- Controls -->
+        <div class="glass-panel p-4 md:p-6 max-w-md w-full mx-auto mb-2 md:mb-4 shadow-2xl flex flex-col gap-4">
+            
+            <div class="flex justify-between items-center gap-4">
+                <button onclick="addMemory()" class="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-[0_0_15px_rgba(0,240,255,0.3)] flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Inject Memory
+                </button>
+                <button onclick="clearMemories()" class="bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-4 rounded-xl border border-white/10 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                </button>
+            </div>
+
+            <div class="mt-2">
+                <div class="flex justify-between text-xs text-gray-400 font-mono mb-2">
+                    <span>Wide Wells (High Temp)</span>
+                    <span>Sharp Wells (Low Temp)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-bold text-purple-400">β</span>
+                    <input type="range" id="betaSlider" min="0.5" max="5.0" step="0.1" value="2.0">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- 3D Scene Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030308, 0.04);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 8, 14);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimize for mobile
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below ground
+
+        // --- The "Cortex Sheet" ---
+        const gridSize = 16;
+        const gridResolution = 80; // Enough for smooth curves, low enough for mobile
+        const geometry = new THREE.PlaneGeometry(gridSize, gridSize, gridResolution, gridResolution);
+        geometry.rotateX(-Math.PI / 2); // Lay flat
+
+        // Keep a copy of the perfectly flat base positions to calculate deformations from
+        const basePositions = new Float32Array(geometry.attributes.position.array);
+
+        // Solid material
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x0a0a2a,
+            emissive: 0x050510,
+            roughness: 0.4,
+            metalness: 0.8,
+            side: THREE.DoubleSide,
+            flatShading: true 
+        });
+
+        // Wireframe overlay for the "data grid" look
+        const wireMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00f0ff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.15
+        });
+
+        const sheet = new THREE.Mesh(geometry, material);
+        const wireSheet = new THREE.Mesh(geometry, wireMaterial);
+        
+        // Group them to easily manipulate together
+        const cortex = new THREE.Group();
+        cortex.add(sheet);
+        cortex.add(wireSheet);
+        scene.add(cortex);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0x222233, 1.5);
+        scene.add(ambientLight);
+
+        // --- Network State (Memories) ---
+        let memories = [];
+        const WELL_DEPTH = 3.5;
+
+        // Colors for the memories
+        const memoryColors = [0x00f0ff, 0xff00ff, 0x00ff88, 0xffaa00, 0xaa00ff];
+
+        function addMemory() {
+            // Random location on the 2D plane
+            const x = (Math.random() - 0.5) * (gridSize * 0.7);
+            const z = (Math.random() - 0.5) * (gridSize * 0.7);
+            
+            const colorHex = memoryColors[memories.length % memoryColors.length];
+            const color = new THREE.Color(colorHex);
+
+            // Create Memory Orb (The injected pattern)
+            const orbGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const orbMat = new THREE.MeshBasicMaterial({ color: color });
+            const orb = new THREE.Mesh(orbGeo, orbMat);
+            orb.position.set(x, 4, z); // Starts high up
+            scene.add(orb);
+
+            // Create an internal light for the gravity well
+            const light = new THREE.PointLight(color, 0, 8);
+            light.position.set(x, 0, z);
+            scene.add(light);
+
+            memories.push({
+                x: x,
+                z: z,
+                intensity: 0, // Starts flat
+                targetIntensity: WELL_DEPTH,
+                orb: orb,
+                light: light,
+                color: color
+            });
+        }
+
+        function clearMemories() {
+            memories.forEach(m => {
+                scene.remove(m.orb);
+                scene.remove(m.light);
+                // Free memory
+                m.orb.geometry.dispose();
+                m.orb.material.dispose();
+            });
+            memories = [];
+        }
+
+        // --- Animation Loop ---
+        const clock = new THREE.Clock();
+        const betaSlider = document.getElementById('betaSlider');
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            const beta = parseFloat(betaSlider.value); // Inverse temperature
+            const positions = geometry.attributes.position.array;
+
+            // Update memory animations (drop in effect)
+            memories.forEach(m => {
+                // Smoothly interpolate intensity
+                m.intensity += (m.targetIntensity - m.intensity) * 0.05;
+                
+                // Animate Orb dropping into the well
+                const targetY = -m.intensity + 0.2;
+                if (m.orb.position.y > targetY) {
+                    m.orb.position.y += (targetY - m.orb.position.y) * 0.1;
+                }
+
+                // Adjust light
+                m.light.intensity = m.intensity * 2.0;
+                m.light.position.y = -m.intensity + 0.5;
+            });
+
+            // Deform the Cortex Sheet based on Energy Function
+            // E = -sum( exp(-beta * distance^2) )
+            for (let i = 0; i < positions.length; i += 3) {
+                const vx = basePositions[i];
+                const vz = basePositions[i + 2];
+                let vy = 0; // Flat base
+
+                for (let j = 0; j < memories.length; j++) {
+                    const m = memories[j];
+                    const dx = vx - m.x;
+                    const dz = vz - m.z;
+                    const distSq = dx*dx + dz*dz;
+                    
+                    // The exponential attention mechanism creates the well
+                    vy -= m.intensity * Math.exp(-distSq * (beta * 0.2));
+                }
+
+                positions[i + 1] = vy;
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+            geometry.computeVertexNormals(); // Update lighting reflections
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+    </script>
+</body>
+</html>

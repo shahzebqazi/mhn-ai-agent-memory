@@ -1,0 +1,54 @@
+cabal-version:   3.0
+name:            inductive-hopfield
+version:         0.1.0.0
+synopsis:        Inductive construction of Hopfield networks from n=2
+license:         BSD-3-Clause
+build-type:      Simple
+
+common warnings
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates
+                 -Wincomplete-uni-patterns -Wredundant-constraints
+
+library
+    import:           warnings
+    exposed-modules:
+        Hopfield.Classical.Types
+        Hopfield.Classical.Hebbian
+        Hopfield.Classical.Update
+        Hopfield.Classical.Energy
+        Hopfield.Classical.Capacity
+        Hopfield.Inductive.Step
+        Hopfield.Modern.Placeholder
+    build-depends:
+        base >= 4.18 && < 5,
+        vector >= 0.13,
+        random >= 1.2
+    hs-source-dirs:   src
+    default-language: GHC2021
+
+executable inductive-hopfield
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:
+        base >= 4.18 && < 5,
+        inductive-hopfield
+    hs-source-dirs:   app
+    default-language: GHC2021
+
+test-suite inductive-hopfield-test
+    import:           warnings
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    other-modules:
+        Hopfield.ClassicalSpec
+        Hopfield.InductiveSpec
+        Hopfield.CapacitySpec
+    build-depends:
+        base >= 4.18 && < 5,
+        inductive-hopfield,
+        hspec >= 2.11,
+        QuickCheck >= 2.14,
+        vector >= 0.13,
+        random >= 1.2
+    hs-source-dirs:   test
+    default-language: GHC2021
