@@ -11,6 +11,8 @@
 
 **A Python library for deterministic associative memory in AI agents.**
 
+> **Status: toy / research memory.** Deterministic associative recall for small agent fact stores and learning Modern Hopfield networks. Useful for Cursor project working memory and offline experiments. **Not** a production replacement for vector DB + LLM memory systems.
+
 [Install](#install) &#8226; [Quick Start](#30-second-example) &#8226; [Features](#features-at-a-glance) &#8226; [How It Works](#how-it-works-plain-english) &#8226; [API Reference](#project-structure)
 
 </div>
