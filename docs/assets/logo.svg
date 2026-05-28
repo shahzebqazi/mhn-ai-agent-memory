@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="mhn-ai-agent-memory">
+  <rect width="128" height="128" rx="20" fill="#0c1222"/>
+  <circle cx="64" cy="56" r="28" fill="none" stroke="#38bdf8" stroke-width="3"/>
+  <circle cx="48" cy="48" r="6" fill="#fbbf24"/>
+  <circle cx="80" cy="50" r="6" fill="#34d399"/>
+  <circle cx="64" cy="72" r="6" fill="#f472b6"/>
+  <path d="M48 48 L64 56 L80 50 M64 56 L64 72" stroke="#64748b" stroke-width="2"/>
+  <text x="64" y="110" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#94a3b8">Hopfield</text>
+</svg>

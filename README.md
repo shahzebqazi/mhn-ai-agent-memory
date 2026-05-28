@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="MHN AI Agent Memory" width="100%" />
+</p>
+
 # MHN AI Agent Memory
 
 ### Associative Memory for AI Agents Using Modern Hopfield Networks

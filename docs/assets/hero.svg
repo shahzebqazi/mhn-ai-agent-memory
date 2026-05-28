@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 320" role="img" aria-label="MHN AI Agent Memory">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e1e2e"/><stop offset="55%" stop-color="#313244"/><stop offset="100%" stop-color="#45475a"/></linearGradient></defs>
+  <rect width="1200" height="320" fill="url(#g)"/>
+  <image xlink:href="logo.svg" x="480" y="40" width="240" height="240"/>
+  <text x="600" y="300" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="22" fill="#cdd6f4" font-weight="600">MHN AI Agent Memory</text>
+</svg>
